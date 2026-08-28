@@ -6,6 +6,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,6 +21,7 @@ import com.mystore.installments.data.entity.SaleItem
 import com.mystore.installments.printer.ReceiptData
 import com.mystore.installments.printer.ReceiptLine
 import com.mystore.installments.ui.components.AppBottomBar
+import com.mystore.installments.ui.components.PinDialog
 import com.mystore.installments.ui.nav.Routes
 import com.mystore.installments.viewmodel.AppViewModel
 
@@ -41,7 +44,20 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
     var downPayment by remember { mutableStateOf("0") }
     var installmentsCount by remember { mutableStateOf("6") }
 
-    val totalAmount = cartItems.sumOf { it.lineTotal }
+    // ---------- صلاحية تعديل السعر يدوياً / الخصم ----------
+    // إن كان صاحب المحل قد عيّن رمز صلاحية (PIN) من الإعدادات، يبقى سعر كل صنف مقفلاً على
+    // السعر الافتراضي للمنتج ولا يمكن تعديله أو إضافة خصم على الفاتورة إلا بعد إدخال الرمز.
+    // إن لم يُعيَّن رمز أصلاً، يبقى التعديل متاحاً كما كان (بدون قيود) تفادياً لتعطيل من لا يريد هذه الميزة.
+    val hasPin = viewModel.appSettings.hasPin
+    var priceUnlocked by remember { mutableStateOf(!hasPin) }
+    var showPricePinDialog by remember { mutableStateOf(false) }
+    var discountText by remember { mutableStateOf("0") }
+    var discountUnlocked by remember { mutableStateOf(!hasPin) }
+    var showDiscountPinDialog by remember { mutableStateOf(false) }
+
+    val grossTotal = cartItems.sumOf { it.lineTotal }
+    val discount = (discountText.toDoubleOrNull() ?: 0.0).coerceIn(0.0, grossTotal)
+    val totalAmount = grossTotal - discount
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("بيع جديد بالتقسيط") }) },
@@ -128,8 +144,23 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                     )
                     Spacer(Modifier.width(8.dp))
                     OutlinedTextField(
-                        value = itemPrice, onValueChange = { itemPrice = it },
-                        label = { Text("سعر البيع بالتقسيط") }, modifier = Modifier.weight(1f)
+                        value = itemPrice,
+                        onValueChange = { if (priceUnlocked) itemPrice = it },
+                        readOnly = !priceUnlocked,
+                        label = { Text(if (priceUnlocked) "سعر البيع (قابل للتعديل)" else "سعر البيع بالتقسيط") },
+                        trailingIcon = {
+                            if (hasPin) {
+                                IconButton(onClick = {
+                                    if (priceUnlocked) priceUnlocked = false else showPricePinDialog = true
+                                }) {
+                                    Icon(
+                                        if (priceUnlocked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                                        contentDescription = "تعديل السعر يدوياً"
+                                    )
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
                     )
                 }
                 Button(
@@ -176,7 +207,30 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
             }
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text("الإجمالي: %.0f".format(totalAmount), style = MaterialTheme.typography.titleMedium)
+            Text("إجمالي الأصناف: %.0f".format(grossTotal), style = MaterialTheme.typography.bodyMedium)
+
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                OutlinedTextField(
+                    value = discountText,
+                    onValueChange = { if (discountUnlocked) discountText = it },
+                    readOnly = !discountUnlocked,
+                    label = { Text("خصم على الفاتورة") },
+                    trailingIcon = {
+                        if (hasPin) {
+                            IconButton(onClick = {
+                                if (discountUnlocked) discountUnlocked = false else showDiscountPinDialog = true
+                            }) {
+                                Icon(
+                                    if (discountUnlocked) Icons.Filled.LockOpen else Icons.Filled.Lock,
+                                    contentDescription = "إضافة خصم"
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Text("الإجمالي بعد الخصم: %.0f".format(totalAmount), style = MaterialTheme.typography.titleMedium)
 
             Row(Modifier.padding(top = 8.dp)) {
                 OutlinedTextField(
@@ -202,21 +256,25 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                             totalAmount = totalAmount,
                             downPayment = down,
                             numberOfInstallments = count,
-                            notes = ""
+                            notes = "",
+                            discount = discount
                         ) { saleId ->
                             val installmentAmount = (totalAmount - down) / count
+                            val receiptLines = mutableListOf(
+                                ReceiptLine("إجمالي الأصناف", "%.0f".format(grossTotal))
+                            )
+                            if (discount > 0) receiptLines.add(ReceiptLine("الخصم", "%.0f".format(discount)))
+                            receiptLines.add(ReceiptLine("الإجمالي بعد الخصم", "%.0f".format(totalAmount)))
+                            receiptLines.add(ReceiptLine("الدفعة المقدمة", "%.0f".format(down)))
+                            receiptLines.add(ReceiptLine("عدد الأقساط", count.toString()))
+                            receiptLines.add(ReceiptLine("قيمة القسط الشهري", "%.0f".format(installmentAmount), bold = true))
                             val receipt = ReceiptData(
-                                storeName = "متجرنا",
+                                storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
                                 title = "فاتورة بيع بالتقسيط رقم $saleId",
                                 customerName = customer.name,
                                 customerPhone = customer.phone,
                                 itemsSummary = cartItems.map { "${it.name} × ${it.quantity} = %.0f".format(it.lineTotal) },
-                                lines = listOf(
-                                    ReceiptLine("الإجمالي", "%.0f".format(totalAmount)),
-                                    ReceiptLine("الدفعة المقدمة", "%.0f".format(down)),
-                                    ReceiptLine("عدد الأقساط", count.toString()),
-                                    ReceiptLine("قيمة القسط الشهري", "%.0f".format(installmentAmount), bold = true)
-                                )
+                                lines = receiptLines
                             )
                             viewModel.setPendingReceipt(receipt)
                             cartItems.clear()
@@ -227,5 +285,22 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                 modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
             ) { Text("حفظ البيع وطباعة الفاتورة") }
         }
+    }
+
+    if (showPricePinDialog) {
+        PinDialog(
+            title = "صلاحية تعديل السعر",
+            appSettings = viewModel.appSettings,
+            onDismiss = { showPricePinDialog = false },
+            onSuccess = { priceUnlocked = true }
+        )
+    }
+    if (showDiscountPinDialog) {
+        PinDialog(
+            title = "صلاحية إضافة خصم",
+            appSettings = viewModel.appSettings,
+            onDismiss = { showDiscountPinDialog = false },
+            onSuccess = { discountUnlocked = true }
+        )
     }
 }

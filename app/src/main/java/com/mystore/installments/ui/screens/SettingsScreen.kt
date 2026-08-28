@@ -3,26 +3,43 @@ package com.mystore.installments.ui.screens
 import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothDevice
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import coil.compose.AsyncImage
+import com.mystore.installments.backup.BackupManager
 import com.mystore.installments.printer.PaperWidth
 import com.mystore.installments.printer.PrinterConnectionType
 import com.mystore.installments.printer.RawCommandParser
 import com.mystore.installments.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * شاشة إعدادات الطابعة: اختيار عرض الورق (58/80مم)، ثم الاتصال إما عبر
@@ -46,6 +63,49 @@ fun SettingsScreen(viewModel: AppViewModel) {
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var codeTableInput by remember(savedCodeTable) { mutableStateOf(savedCodeTable?.toString() ?: "") }
     var customCommandInput by remember { mutableStateOf("") }
+
+    // ---------- بيانات المحل (اسم + شعار يظهر أعلى كل فاتورة) ----------
+    var storeName by remember { mutableStateOf(viewModel.appSettings.storeName) }
+    var storeLogoUri by remember { mutableStateOf(viewModel.appSettings.storeLogoUri?.let { Uri.parse(it) }) }
+    val logoPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: SecurityException) { /* بعض المصادر لا تدعم الصلاحية الدائمة */ }
+            storeLogoUri = uri
+            viewModel.appSettings.storeLogoUri = uri.toString()
+        }
+    }
+
+    // ---------- صلاحية تعديل السعر/الخصم (PIN) ----------
+    var hasPin by remember { mutableStateOf(viewModel.appSettings.hasPin) }
+    var newPin by remember { mutableStateOf("") }
+    var pinMessage by remember { mutableStateOf<String?>(null) }
+
+    // ---------- نسخ احتياطي واستعادة ----------
+    val scopeBackup = rememberCoroutineScope()
+    var backupMessage by remember { mutableStateOf<String?>(null) }
+    var showRestoreConfirm by remember { mutableStateOf<Uri?>(null) }
+    val backupFileName = remember {
+        "installment_sales_backup_" + SimpleDateFormat("yyyyMMdd_HHmm", Locale("ar")).format(Date()) + ".db"
+    }
+    val backupLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/octet-stream")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            scopeBackup.launch {
+                val ok = BackupManager.backupTo(context, uri)
+                backupMessage = if (ok) "تم حفظ النسخة الاحتياطية بنجاح ✅" else "فشل إنشاء النسخة الاحتياطية"
+            }
+        }
+    }
+    val restoreLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) showRestoreConfirm = uri
+    }
 
     // ---------- إدارة صلاحيات البلوتوث وقت التشغيل ----------
     val requiredBtPermissions = remember {
@@ -103,8 +163,132 @@ fun SettingsScreen(viewModel: AppViewModel) {
         onDispose { viewModel.printerManager.stopBluetoothDiscovery() }
     }
 
-    Scaffold(topBar = { TopAppBar(title = { Text("إعدادات الطابعة") }) }) { padding ->
-        Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
+    Scaffold(topBar = { TopAppBar(title = { Text("الإعدادات") }) }) { padding ->
+        // تمرير عمودي للشاشة كاملة، لأن المحتوى (بيانات المحل + بلوتوث + USB + إصلاح العربية +
+        // الأوامر المخصّصة + النسخ الاحتياطي) أطول من الشاشة على أغلب الهواتف
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp)
+        ) {
+
+            // ---------- بيانات المحل: الاسم والشعار (يظهران أعلى كل فاتورة مطبوعة) ----------
+            Text("بيانات المحل", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { logoPicker.launch(arrayOf("image/*")) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (storeLogoUri != null) {
+                        AsyncImage(
+                            model = storeLogoUri,
+                            contentDescription = "شعار المحل",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                        IconButton(
+                            onClick = {
+                                storeLogoUri = null
+                                viewModel.appSettings.clearLogo()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.4f), RoundedCornerShape(50))
+                                .size(20.dp)
+                        ) {
+                            Icon(Icons.Filled.Close, contentDescription = "إزالة الشعار", tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(12.dp))
+                        }
+                    } else {
+                        Icon(Icons.Filled.AddAPhoto, contentDescription = "إضافة شعار")
+                    }
+                }
+                Spacer(Modifier.width(12.dp))
+                OutlinedTextField(
+                    value = storeName,
+                    onValueChange = { storeName = it; viewModel.appSettings.storeName = it },
+                    label = { Text("اسم المحل (يظهر أعلى الفاتورة)") },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+            Text(
+                "اضغط على الصورة لاختيار شعار المحل؛ سيُطبع أعلى كل فاتورة ووصل بشكل تلقائي.",
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // ---------- صلاحية تعديل السعر يدوياً/الخصم وقت البيع ----------
+            Text("صلاحية الخصم وتعديل السعر", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (hasPin) "مفعّلة حالياً: يُطلب رمز الصلاحية عند تعديل السعر أو إضافة خصم في شاشة البيع."
+                else "غير مفعّلة: يمكن لأي مستخدم تعديل السعر أو إضافة خصم دون قيود. عيّن رمزاً أدناه لتفعيلها.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newPin,
+                    onValueChange = { newPin = it.filter { c -> c.isDigit() } },
+                    label = { Text(if (hasPin) "رمز جديد (لتغييره)" else "عيّن رمز صلاحية") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    if (newPin.length >= 4) {
+                        viewModel.appSettings.setPin(newPin)
+                        hasPin = true
+                        newPin = ""
+                        pinMessage = "تم حفظ رمز الصلاحية"
+                    } else {
+                        pinMessage = "الرمز يجب أن يكون 4 أرقام على الأقل"
+                    }
+                }) { Text("حفظ") }
+            }
+            if (hasPin) {
+                Spacer(Modifier.height(4.dp))
+                TextButton(onClick = {
+                    viewModel.appSettings.clearPin()
+                    hasPin = false
+                    pinMessage = "تم إلغاء صلاحية القفل، التعديل أصبح متاحاً للجميع"
+                }) { Text("إلغاء تفعيل الصلاحية") }
+            }
+            pinMessage?.let {
+                Text(it, style = MaterialTheme.typography.bodySmall)
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // ---------- نسخ احتياطي واستعادة لقاعدة البيانات ----------
+            Text("نسخ احتياطي واستعادة", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "احفظ نسخة من كل بيانات التطبيق (العملاء، المنتجات، الفواتير، الأقساط) في مكان تختاره " +
+                    "(تخزين الهاتف، بطاقة ذاكرة، أو أي تطبيق مزامنة سحابي). يُنصح بأخذ نسخة بشكل دوري.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { backupLauncher.launch(backupFileName) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("💾 إنشاء نسخة احتياطية") }
+                OutlinedButton(
+                    onClick = { restoreLauncher.launch(arrayOf("*/*")) },
+                    modifier = Modifier.weight(1f)
+                ) { Text("♻️ استعادة من نسخة") }
+            }
+            backupMessage?.let {
+                Spacer(Modifier.height(6.dp))
+                Text(it, style = MaterialTheme.typography.bodySmall)
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Text("عرض الورق", style = MaterialTheme.typography.titleMedium)
             Row(Modifier.padding(vertical = 8.dp)) {
@@ -328,5 +512,34 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 Text(it, style = MaterialTheme.typography.bodyMedium)
             }
         }
+    }
+
+    // تأكيد قبل الاستعادة، لأنها تستبدل كل البيانات الحالية بمحتوى الملف المختار (إجراء لا يمكن التراجع عنه)
+    showRestoreConfirm?.let { uri ->
+        AlertDialog(
+            onDismissRequest = { showRestoreConfirm = null },
+            title = { Text("تأكيد الاستعادة") },
+            text = {
+                Text(
+                    "سيتم استبدال كل البيانات الحالية (العملاء، الفواتير، الأقساط) بمحتوى النسخة " +
+                        "المختارة، ولا يمكن التراجع عن هذا الإجراء. سيُعاد تشغيل التطبيق تلقائياً بعد الاستعادة."
+                )
+            },
+            confirmButton = {
+                Button(onClick = {
+                    val target = uri
+                    showRestoreConfirm = null
+                    scopeBackup.launch {
+                        val ok = BackupManager.restoreFrom(context, target)
+                        if (ok) {
+                            BackupManager.restartApp(context)
+                        } else {
+                            backupMessage = "فشلت عملية الاستعادة، تأكد أن الملف المختار نسخة احتياطية صحيحة"
+                        }
+                    }
+                }) { Text("استعادة الآن") }
+            },
+            dismissButton = { TextButton(onClick = { showRestoreConfirm = null }) { Text("إلغاء") } }
+        )
     }
 }

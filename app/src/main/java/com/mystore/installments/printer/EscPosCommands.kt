@@ -1,5 +1,7 @@
 package com.mystore.installments.printer
 
+import android.graphics.Bitmap
+import android.graphics.Color
 import java.io.ByteArrayOutputStream
 import java.nio.charset.Charset
 
@@ -59,6 +61,48 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
     fun keyValue(label: String, value: String): EscPosBuilder {
         val space = (charsPerLine - label.length - value.length).coerceAtLeast(1)
         text(value + " ".repeat(space) + label)
+        return this
+    }
+
+    /**
+     * يطبع صورة (شعار المحل) كصورة نقطية (Raster) عبر أمر GS v 0، وهو الأمر المدعوم على
+     * أغلب الطابعات الحرارية الرخيصة لطباعة الصور خلافاً للنص. تُحوَّل الصورة أولاً إلى
+     * أبيض/أسود فقط (Threshold) لأن الطابعات الحرارية لا تدعم درجات الرمادي.
+     * @param maxWidthDots عرض الورق بالنقاط (384 لعرض 58مم تقريباً، 576 لعرض 80مم بدقة 203dpi الشائعة)
+     */
+    fun image(bitmap: Bitmap, maxWidthDots: Int): EscPosBuilder {
+        // عرض الصورة يجب أن يكون من مضاعفات 8 (كل بايت يمثل 8 نقاط أفقياً)
+        val targetWidth = (maxWidthDots / 8) * 8
+        val scale = targetWidth.toFloat() / bitmap.width
+        val targetHeight = (bitmap.height * scale).toInt().coerceAtLeast(1)
+        val scaled = Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
+
+        val widthBytes = targetWidth / 8
+        val raster = ByteArray(widthBytes * targetHeight)
+
+        for (y in 0 until targetHeight) {
+            for (xByte in 0 until widthBytes) {
+                var b = 0
+                for (bit in 0 until 8) {
+                    val x = xByte * 8 + bit
+                    val pixel = scaled.getPixel(x, y)
+                    // نحسب درجة الإضاءة ونعتبر أي بكسل داكن نقطة "حبر" تُطبع (1)
+                    val luminance = (Color.red(pixel) * 0.3 + Color.green(pixel) * 0.59 + Color.blue(pixel) * 0.11)
+                    val isDark = Color.alpha(pixel) > 32 && luminance < 160
+                    if (isDark) b = b or (0x80 shr bit)
+                }
+                raster[y * widthBytes + xByte] = b.toByte()
+            }
+        }
+        scaled.recycle()
+
+        // GS v 0: m=0 (وضع عادي)، ثم عرض الصورة بالبايت (منخفض/عالي) وارتفاعها بالبايت (منخفض/عالي)
+        buffer.write(byteArrayOf(0x1D, 0x76, 0x30, 0x00))
+        buffer.write(widthBytes and 0xFF)
+        buffer.write((widthBytes shr 8) and 0xFF)
+        buffer.write(targetHeight and 0xFF)
+        buffer.write((targetHeight shr 8) and 0xFF)
+        buffer.write(raster)
         return this
     }
 

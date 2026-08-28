@@ -17,5 +17,6 @@ data class Sale(
     val numberOfInstallments: Int, // عدد الأقساط
     val installmentAmount: Double, // قيمة القسط الواحد
     val notes: String = "",
-    val status: SaleStatus = SaleStatus.ACTIVE
+    val status: SaleStatus = SaleStatus.ACTIVE,
+    val discount: Double = 0.0     // قيمة الخصم الممنوح على الفاتورة (يتطلب صلاحية وقت البيع)
 )

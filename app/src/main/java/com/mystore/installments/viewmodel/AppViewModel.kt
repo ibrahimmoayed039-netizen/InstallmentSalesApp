@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.mystore.installments.data.AppDatabase
+import com.mystore.installments.data.AppSettings
 import com.mystore.installments.data.entity.*
 import com.mystore.installments.printer.PrinterManager
 import com.mystore.installments.printer.ReceiptData
@@ -21,6 +22,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         db.customerDao(), db.saleDao(), db.installmentDao(), db.paymentDao(), db.productDao()
     )
     val printerManager = PrinterManager(application)
+    val appSettings = AppSettings(application)
 
     val customers: StateFlow<List<Customer>> =
         repository.getCustomers().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -96,10 +98,11 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         downPayment: Double,
         numberOfInstallments: Int,
         notes: String,
+        discount: Double = 0.0,
         onDone: (Long) -> Unit
     ) {
         viewModelScope.launch {
-            val id = repository.createSale(customerId, items, totalAmount, downPayment, numberOfInstallments, notes)
+            val id = repository.createSale(customerId, items, totalAmount, downPayment, numberOfInstallments, notes, discount)
             onDone(id)
         }
     }

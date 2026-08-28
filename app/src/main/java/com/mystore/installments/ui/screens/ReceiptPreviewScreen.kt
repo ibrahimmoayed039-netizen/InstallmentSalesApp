@@ -8,10 +8,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import coil.compose.AsyncImage
 import com.mystore.installments.printer.PrinterConnectionType
 import com.mystore.installments.printer.ReceiptBuilder
 import com.mystore.installments.ui.nav.Routes
@@ -61,12 +63,26 @@ fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) 
                 } else {
                     val charsPerLine = viewModel.printerManager.paperWidth.charsPerLine
                     val previewLines = ReceiptBuilder.buildPreviewLines(data, charsPerLine)
+                    val logoUri = viewModel.appSettings.storeLogoUri
                     LazyColumn(
                         modifier = Modifier
                             .fillMaxSize()
                             .background(Color.White)
                             .padding(16.dp)
                     ) {
+                        if (logoUri != null) {
+                            item {
+                                AsyncImage(
+                                    model = logoUri,
+                                    contentDescription = "شعار المحل",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(90.dp)
+                                        .padding(bottom = 8.dp),
+                                    contentScale = ContentScale.Fit
+                                )
+                            }
+                        }
                         items(previewLines) { line ->
                             Text(
                                 text = line,

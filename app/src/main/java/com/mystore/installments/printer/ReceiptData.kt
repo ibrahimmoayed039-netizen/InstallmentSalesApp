@@ -1,5 +1,6 @@
 package com.mystore.installments.printer
 
+import android.graphics.Bitmap
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,11 +25,21 @@ data class ReceiptData(
 
 // يحوّل بيانات الوصل إلى أوامر ESC/POS جاهزة للإرسال للطابعة
 object ReceiptBuilder {
-    fun build(data: ReceiptData, charsPerLine: Int = 48, codeTable: Int? = null): ByteArray {
+    fun build(
+        data: ReceiptData,
+        charsPerLine: Int = 48,
+        codeTable: Int? = null,
+        logo: Bitmap? = null,
+        logoWidthDots: Int = 384
+    ): ByteArray {
         val b = EscPosBuilder(charsPerLine).init()
         if (codeTable != null) b.selectCharacterTable(codeTable)
         b.alignCenter()
-            .doubleHeight(true)
+        if (logo != null) {
+            b.image(logo, logoWidthDots)
+            b.feed(1)
+        }
+        b.doubleHeight(true)
             .bold(true)
             .text(data.storeName)
             .doubleHeight(false)

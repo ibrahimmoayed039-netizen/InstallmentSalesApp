@@ -7,6 +7,7 @@ import com.mystore.installments.data.dao.ProductDao
 import com.mystore.installments.data.dao.SaleDao
 import com.mystore.installments.data.entity.*
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import java.util.Calendar
 
 // طبقة الوسيطة بين الواجهات وقاعدة البيانات، وتحتوي على منطق الأعمال الأساسي
@@ -56,7 +57,8 @@ class StoreRepository(
         totalAmount: Double,
         downPayment: Double,
         numberOfInstallments: Int,
-        notes: String = ""
+        notes: String = "",
+        discount: Double = 0.0
     ): Long {
         val remaining = totalAmount - downPayment
         val installmentAmount = if (numberOfInstallments > 0) remaining / numberOfInstallments else 0.0
@@ -67,7 +69,8 @@ class StoreRepository(
             downPayment = downPayment,
             numberOfInstallments = numberOfInstallments,
             installmentAmount = installmentAmount,
-            notes = notes
+            notes = notes,
+            discount = discount
         )
         val saleId = saleDao.insert(sale)
 
@@ -122,6 +125,16 @@ class StoreRepository(
 
     fun getRecentPayments(limit: Int = 30): Flow<List<Payment>> = paymentDao.getRecent(limit)
     fun getPaymentsForSale(saleId: Long): Flow<List<Payment>> = paymentDao.getForSale(saleId)
+
+    /**
+     * يجمع كل عمليات بيع العميل مع جداول أقساطها، لبناء كشف حساب كامل (فاتورة واحدة تلخّص
+     * كل تعاملات العميل بدل طباعة كل فاتورة على حدة).
+     */
+    suspend fun getCustomerStatementItems(customerId: Long): List<Pair<Sale, List<Installment>>> {
+        // نستخدم أول قيمة فقط من التدفق (Flow) لأن هذه قراءة لحظية لغرض الطباعة، وليست عرضاً حياً
+        val salesList = saleDao.getByCustomer(customerId).first()
+        return salesList.map { sale -> sale to installmentDao.getForSaleOnce(sale.id) }
+    }
 
     /** تحديث حالة الأقساط المتأخرة (يُستدعى دورياً عند فتح الشاشة الرئيسية) */
     suspend fun refreshOverdueStatuses() {

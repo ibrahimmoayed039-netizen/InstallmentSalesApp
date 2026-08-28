@@ -16,6 +16,7 @@ import com.mystore.installments.data.entity.InstallmentStatus
 import com.mystore.installments.data.entity.Sale
 import com.mystore.installments.printer.ReceiptData
 import com.mystore.installments.printer.ReceiptLine
+import com.mystore.installments.ui.components.PayInstallmentDialog
 import com.mystore.installments.ui.nav.Routes
 import com.mystore.installments.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
@@ -48,6 +49,25 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
                         Column(Modifier.padding(14.dp)) {
                             Text("الهاتف: ${it.phone}")
                             if (it.address.isNotBlank()) Text("العنوان: ${it.address}")
+                            Spacer(Modifier.height(8.dp))
+                            // كشف حساب كامل: كل مبيعات العميل وأقساطه في وصل واحد، مفيد عند
+                            // مراجعة حساب العميل كاملاً أو تسليمه ورقة واحدة تلخّص كل تعاملاته
+                            OutlinedButton(
+                                onClick = {
+                                    scope.launch {
+                                        val cust = customer ?: return@launch
+                                        val saleGroups = viewModel.repository.getCustomerStatementItems(customerId)
+                                        val receipt = buildStatementReceipt(
+                                            storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
+                                            customer = cust,
+                                            saleGroups = saleGroups
+                                        )
+                                        viewModel.setPendingReceipt(receipt)
+                                        navController.navigate(Routes.RECEIPT_PREVIEW)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("🧾 طباعة كشف حساب كامل") }
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -65,18 +85,22 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
                         scope.launch {
                             val cust = customer ?: return@launch
                             val items = viewModel.repository.getSaleItems(s.id)
+                            val lines = mutableListOf<ReceiptLine>()
+                            if (s.discount > 0) {
+                                lines.add(ReceiptLine("إجمالي الأصناف", "%.0f".format(s.totalAmount + s.discount)))
+                                lines.add(ReceiptLine("الخصم", "%.0f".format(s.discount)))
+                            }
+                            lines.add(ReceiptLine("الإجمالي", "%.0f".format(s.totalAmount)))
+                            lines.add(ReceiptLine("الدفعة المقدمة", "%.0f".format(s.downPayment)))
+                            lines.add(ReceiptLine("عدد الأقساط", s.numberOfInstallments.toString()))
+                            lines.add(ReceiptLine("قيمة القسط", "%.0f".format(s.installmentAmount), bold = true))
                             val receipt = ReceiptData(
-                                storeName = "متجرنا",
+                                storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
                                 title = "فاتورة بيع بالتقسيط رقم ${s.id}",
                                 customerName = cust.name,
                                 customerPhone = cust.phone,
                                 itemsSummary = items.map { "${it.name} × ${it.quantity} = ${"%.0f".format(it.lineTotal)}" },
-                                lines = listOf(
-                                    ReceiptLine("الإجمالي", "%.0f".format(s.totalAmount)),
-                                    ReceiptLine("الدفعة المقدمة", "%.0f".format(s.downPayment)),
-                                    ReceiptLine("عدد الأقساط", s.numberOfInstallments.toString()),
-                                    ReceiptLine("قيمة القسط", "%.0f".format(s.installmentAmount), bold = true)
-                                )
+                                lines = lines
                             )
                             viewModel.setPendingReceipt(receipt)
                             navController.navigate(Routes.RECEIPT_PREVIEW)
@@ -90,13 +114,60 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
 
     payDialogInstallment?.let { inst ->
         PayInstallmentDialog(
-            installment = inst,
-            customer = customer,
+            installmentId = inst.id,
+            installmentNumber = inst.installmentNumber,
+            remaining = inst.amount - inst.paidAmount,
+            customerName = customer?.name ?: "",
+            customerPhone = customer?.phone ?: "",
             onDismiss = { payDialogInstallment = null },
             onConfirmed = { navController.navigate(Routes.RECEIPT_PREVIEW) },
             viewModel = viewModel
         )
     }
+}
+
+/** يبني وصل "كشف حساب" واحد يجمع كل فواتير العميل وجداول أقساطها وإجمالياتها */
+private fun buildStatementReceipt(
+    storeName: String,
+    customer: Customer,
+    saleGroups: List<Pair<Sale, List<Installment>>>
+): ReceiptData {
+    val itemsSummary = mutableListOf<String>()
+    var totalSold = 0.0
+    var totalPaid = 0.0
+    var totalRemaining = 0.0
+
+    saleGroups.forEach { (sale, installments) ->
+        itemsSummary.add("── فاتورة #${sale.id} — ${sale.status} ──")
+        itemsSummary.add("الإجمالي: %.0f  •  المقدم: %.0f".format(sale.totalAmount, sale.downPayment))
+        installments.forEach { inst ->
+            val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale("ar")).format(Date(inst.dueDate))
+            val statusLabel = when (inst.status) {
+                InstallmentStatus.PAID -> "مسدد"
+                InstallmentStatus.LATE -> "متأخر"
+                InstallmentStatus.PENDING -> "غير مسدد"
+            }
+            itemsSummary.add("قسط ${inst.installmentNumber} ($dateStr): %.0f/%.0f [$statusLabel]".format(inst.paidAmount, inst.amount))
+        }
+        totalSold += sale.totalAmount
+        val paidForSale = installments.sumOf { it.paidAmount } + sale.downPayment
+        totalPaid += paidForSale
+        totalRemaining += (sale.totalAmount - paidForSale).coerceAtLeast(0.0)
+    }
+
+    return ReceiptData(
+        storeName = storeName,
+        title = "كشف حساب العميل",
+        customerName = customer.name,
+        customerPhone = customer.phone,
+        itemsSummary = itemsSummary,
+        lines = listOf(
+            ReceiptLine("عدد الفواتير", saleGroups.size.toString()),
+            ReceiptLine("إجمالي المبيعات", "%.0f".format(totalSold)),
+            ReceiptLine("إجمالي المُحصَّل", "%.0f".format(totalPaid)),
+            ReceiptLine("إجمالي المتبقي", "%.0f".format(totalRemaining), bold = true)
+        )
+    )
 }
 
 @Composable
@@ -145,56 +216,4 @@ private fun SaleCard(
             }
         }
     }
-}
-
-@Composable
-private fun PayInstallmentDialog(
-    installment: Installment,
-    customer: Customer?,
-    onDismiss: () -> Unit,
-    onConfirmed: () -> Unit,
-    viewModel: AppViewModel
-) {
-    val remaining = installment.amount - installment.paidAmount
-    var amountText by remember { mutableStateOf(remaining.toString()) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("تسديد القسط رقم ${installment.installmentNumber}") },
-        text = {
-            Column {
-                Text("المتبقي على هذا القسط: %.0f".format(remaining))
-                Spacer(Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = amountText,
-                    onValueChange = { amountText = it },
-                    label = { Text("المبلغ المسدد الآن") }
-                )
-            }
-        },
-        confirmButton = {
-            Button(onClick = {
-                val amount = amountText.toDoubleOrNull() ?: 0.0
-                if (amount > 0) {
-                    viewModel.payInstallment(installment.id, amount) { payment ->
-                        val receipt = ReceiptData(
-                            storeName = "متجرنا",
-                            title = "وصل استلام دفعة",
-                            customerName = customer?.name ?: "",
-                            customerPhone = customer?.phone ?: "",
-                            lines = listOf(
-                                ReceiptLine("القسط رقم", installment.installmentNumber.toString()),
-                                ReceiptLine("المبلغ المسدد", "%.0f".format(amount), bold = true),
-                                ReceiptLine("المتبقي على القسط", "%.0f".format((remaining - amount).coerceAtLeast(0.0)))
-                            )
-                        )
-                        viewModel.setPendingReceipt(receipt)
-                    }
-                    onDismiss()
-                    onConfirmed()
-                }
-            }) { Text("تأكيد وطباعة الوصل") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("إلغاء") } }
-    )
 }

@@ -10,6 +10,9 @@ interface InstallmentDao {
     @Query("SELECT * FROM installments WHERE saleId = :saleId ORDER BY installmentNumber ASC")
     fun getForSale(saleId: Long): Flow<List<Installment>>
 
+    @Query("SELECT * FROM installments WHERE saleId = :saleId ORDER BY installmentNumber ASC")
+    suspend fun getForSaleOnce(saleId: Long): List<Installment>
+
     @Query("SELECT * FROM installments ORDER BY dueDate ASC")
     fun getAll(): Flow<List<Installment>>
 

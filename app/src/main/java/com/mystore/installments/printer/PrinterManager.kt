@@ -2,20 +2,26 @@ package com.mystore.installments.printer
 
 import android.bluetooth.BluetoothDevice
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.hardware.usb.UsbDevice
+import android.net.Uri
+import com.mystore.installments.data.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
 enum class PrinterConnectionType { BLUETOOTH, USB, NONE }
-enum class PaperWidth(val charsPerLine: Int) { MM58(32), MM80(48) }
+// dotsWidth: عرض الورق بالنقاط، يُستخدم فقط عند طباعة شعار المحل (رسم نقطي)
+enum class PaperWidth(val charsPerLine: Int, val dotsWidth: Int) { MM58(32, 384), MM80(48, 576) }
 
 /**
  * واجهة موحّدة فوق مديري البلوتوث و USB، بحيث تتعامل الشاشات مع نقطة واحدة
  * بغض النظر عن نوع الاتصال الفعلي بالطابعة الحرارية.
  */
-class PrinterManager(context: Context) {
+class PrinterManager(private val context: Context) {
     private val bluetoothManager = BluetoothPrinterManager(context)
     private val usbManager = UsbPrinterManager(context)
+    private val appSettings = AppSettings(context)
 
     private val prefs = context.getSharedPreferences("printer_settings", Context.MODE_PRIVATE)
 
@@ -79,10 +85,23 @@ class PrinterManager(context: Context) {
         return printRawBytes(bytes)
     }
 
-    /** يطبع الوصل فعلياً عبر نوع الاتصال الحالي (بلوتوث أو USB) */
+    /** يطبع الوصل فعلياً عبر نوع الاتصال الحالي (بلوتوث أو USB)، مع شعار المحل إن كان محفوظاً في الإعدادات */
     suspend fun print(data: ReceiptData): Boolean {
-        val bytes = ReceiptBuilder.build(data, paperWidth.charsPerLine, _codeTable.value)
+        val logo = loadLogoBitmap()
+        val bytes = ReceiptBuilder.build(data, paperWidth.charsPerLine, _codeTable.value, logo, paperWidth.dotsWidth)
         return printRawBytes(bytes)
+    }
+
+    /** يقرأ صورة شعار المحل المحفوظة (إن وُجدت) لتُستخدم في الطباعة الفعلية */
+    fun loadLogoBitmap(): Bitmap? {
+        val uriString = appSettings.storeLogoUri ?: return null
+        return try {
+            context.contentResolver.openInputStream(Uri.parse(uriString))?.use { stream ->
+                BitmapFactory.decodeStream(stream)
+            }
+        } catch (e: Exception) {
+            null
+        }
     }
 
     fun isConnected(): Boolean = _connectionType.value != PrinterConnectionType.NONE
