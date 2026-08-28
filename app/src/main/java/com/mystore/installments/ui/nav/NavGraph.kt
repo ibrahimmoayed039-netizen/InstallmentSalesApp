@@ -21,6 +21,9 @@ object Routes {
     const val RECEIPT_PREVIEW = "receipt_preview"
     const val CUSTOMER_DETAIL = "customer_detail/{customerId}"
     fun customerDetail(id: Long) = "customer_detail/$id"
+    const val PRODUCTS = "products"
+    const val PRODUCT_FORM = "product_form?productId={productId}"
+    fun productForm(id: Long? = null) = "product_form?productId=${id ?: 0L}"
 }
 
 @Composable
@@ -59,6 +62,20 @@ fun AppNavGraph(viewModel: AppViewModel) {
         }
         composable(Routes.RECEIPT_PREVIEW) {
             ReceiptPreviewScreen(viewModel = viewModel, navController = navController)
+        }
+        composable(Routes.PRODUCTS) {
+            ProductsScreen(viewModel = viewModel, navController = navController)
+        }
+        composable(
+            Routes.PRODUCT_FORM,
+            arguments = listOf(navArgument("productId") { type = NavType.LongType; defaultValue = 0L })
+        ) { backStackEntry ->
+            val productId = backStackEntry.arguments?.getLong("productId") ?: 0L
+            ProductFormScreen(
+                viewModel = viewModel,
+                navController = navController,
+                productId = if (productId == 0L) null else productId
+            )
         }
     }
 }

@@ -14,6 +14,7 @@ data class BottomItem(val route: String, val label: String, val icon: androidx.c
 private val bottomItems = listOf(
     BottomItem(Routes.DASHBOARD, "الرئيسية", Icons.Filled.Home),
     BottomItem(Routes.CUSTOMERS, "العملاء", Icons.Filled.Person),
+    BottomItem(Routes.PRODUCTS, "المنتجات", Icons.Filled.Inventory2),
     BottomItem(Routes.NEW_SALE, "بيع جديد", Icons.Filled.AddShoppingCart),
     BottomItem(Routes.INSTALLMENTS, "الأقساط", Icons.Filled.Payments),
     BottomItem(Routes.REPORTS, "التقارير", Icons.Filled.Assessment)

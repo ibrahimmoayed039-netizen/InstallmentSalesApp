@@ -3,6 +3,7 @@ package com.mystore.installments.repository
 import com.mystore.installments.data.dao.CustomerDao
 import com.mystore.installments.data.dao.InstallmentDao
 import com.mystore.installments.data.dao.PaymentDao
+import com.mystore.installments.data.dao.ProductDao
 import com.mystore.installments.data.dao.SaleDao
 import com.mystore.installments.data.entity.*
 import kotlinx.coroutines.flow.Flow
@@ -13,7 +14,8 @@ class StoreRepository(
     private val customerDao: CustomerDao,
     private val saleDao: SaleDao,
     private val installmentDao: InstallmentDao,
-    private val paymentDao: PaymentDao
+    private val paymentDao: PaymentDao,
+    private val productDao: ProductDao
 ) {
     // ---------- العملاء ----------
     fun getCustomers(): Flow<List<Customer>> = customerDao.getAll()
@@ -22,6 +24,15 @@ class StoreRepository(
     suspend fun addCustomer(customer: Customer): Long = customerDao.insert(customer)
     suspend fun updateCustomer(customer: Customer) = customerDao.update(customer)
     suspend fun deleteCustomer(customer: Customer) = customerDao.delete(customer)
+
+    // ---------- المنتجات ----------
+    fun getProducts(): Flow<List<Product>> = productDao.getAll()
+    fun searchProducts(query: String): Flow<List<Product>> = productDao.search(query)
+    suspend fun getProduct(id: Long): Product? = productDao.getById(id)
+    suspend fun getProductByBarcode(barcode: String): Product? = productDao.getByBarcode(barcode)
+    suspend fun addProduct(product: Product): Long = productDao.insert(product)
+    suspend fun updateProduct(product: Product) = productDao.update(product)
+    suspend fun deleteProduct(product: Product) = productDao.delete(product)
 
     // ---------- المبيعات ----------
     fun getSales(): Flow<List<Sale>> = saleDao.getAll()

@@ -24,9 +24,10 @@ data class ReceiptData(
 
 // يحوّل بيانات الوصل إلى أوامر ESC/POS جاهزة للإرسال للطابعة
 object ReceiptBuilder {
-    fun build(data: ReceiptData, charsPerLine: Int = 48): ByteArray {
+    fun build(data: ReceiptData, charsPerLine: Int = 48, codeTable: Int? = null): ByteArray {
         val b = EscPosBuilder(charsPerLine).init()
-            .alignCenter()
+        if (codeTable != null) b.selectCharacterTable(codeTable)
+        b.alignCenter()
             .doubleHeight(true)
             .bold(true)
             .text(data.storeName)

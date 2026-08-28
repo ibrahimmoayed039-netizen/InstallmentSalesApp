@@ -17,11 +17,16 @@ import kotlinx.coroutines.launch
 class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val db = AppDatabase.getInstance(application)
-    val repository = StoreRepository(db.customerDao(), db.saleDao(), db.installmentDao(), db.paymentDao())
+    val repository = StoreRepository(
+        db.customerDao(), db.saleDao(), db.installmentDao(), db.paymentDao(), db.productDao()
+    )
     val printerManager = PrinterManager(application)
 
     val customers: StateFlow<List<Customer>> =
         repository.getCustomers().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val products: StateFlow<List<Product>> =
+        repository.getProducts().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val sales: StateFlow<List<Sale>> =
         repository.getSales().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -36,6 +41,47 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val id = repository.addCustomer(Customer(name = name, phone = phone, address = address))
             onDone(id)
+        }
+    }
+
+    // ---------- المنتجات ----------
+    fun addProduct(
+        name: String,
+        barcode: String,
+        category: String,
+        costPrice: Double,
+        cashPrice: Double,
+        installmentPrice: Double,
+        imageUri: String? = null,
+        onDone: (Long) -> Unit = {}
+    ) {
+        viewModelScope.launch {
+            val id = repository.addProduct(
+                Product(
+                    name = name,
+                    barcode = barcode,
+                    category = category,
+                    costPrice = costPrice,
+                    cashPrice = cashPrice,
+                    installmentPrice = installmentPrice,
+                    imageUri = imageUri
+                )
+            )
+            onDone(id)
+        }
+    }
+
+    fun updateProduct(product: Product, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.updateProduct(product)
+            onDone()
+        }
+    }
+
+    fun deleteProduct(product: Product, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteProduct(product)
+            onDone()
         }
     }
 

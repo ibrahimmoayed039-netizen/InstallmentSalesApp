@@ -6,8 +6,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mystore.installments.printer.PaperWidth
 import com.mystore.installments.printer.PrinterConnectionType
@@ -25,9 +27,11 @@ fun SettingsScreen(viewModel: AppViewModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val connectionType by viewModel.printerManager.connectionType.collectAsState()
+    val savedCodeTable by viewModel.printerManager.codeTable.collectAsState()
 
     var paperWidth by remember { mutableStateOf(PaperWidth.MM80) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
+    var codeTableInput by remember(savedCodeTable) { mutableStateOf(savedCodeTable?.toString() ?: "") }
 
     Scaffold(topBar = { TopAppBar(title = { Text("إعدادات الطابعة") }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
@@ -47,7 +51,7 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 )
             }
 
-            Divider(Modifier.padding(vertical = 12.dp))
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
 
             Text(
                 "حالة الاتصال: " + when (connectionType) {
@@ -110,6 +114,55 @@ fun SettingsScreen(viewModel: AppViewModel) {
                         )
                     }
                 }
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // ---------- اختبار جداول الحروف لإصلاح ظهور اللغة العربية ----------
+            Text("إصلاح ظهور اللغة العربية", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "إذا كانت الطابعة تطبع رموزاً غريبة بدل النص العربي، اطبع ورقة الاختبار التالية. " +
+                    "ستظهر نفس الجملة العربية مكررة تحت كل رقم جدول من CP0 إلى CP47 ثم CP255. " +
+                    "ابحث عن الرقم الذي تظهر تحته الجملة بشكل عربي صحيح، ثم أدخله أدناه واحفظه.",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    scope.launch {
+                        val ok = viewModel.printerManager.printCharacterTableTest()
+                        statusMessage = if (ok) "تم إرسال ورقة الاختبار للطابعة" else "الطابعة غير متصلة، اتصل بها أولاً"
+                    }
+                },
+                enabled = connectionType != PrinterConnectionType.NONE,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("🔍 اختبار جداول الحروف (لإصلاح اللغة العربية)")
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = codeTableInput,
+                    onValueChange = { codeTableInput = it },
+                    label = { Text("رقم الجدول الصحيح (مثال: 22)") },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(onClick = {
+                    val n = codeTableInput.toIntOrNull()
+                    viewModel.printerManager.setCodeTable(n)
+                    statusMessage = if (n != null) "تم حفظ جدول الحروف رقم $n، سيُستخدم في كل الفواتير القادمة"
+                    else "تم إلغاء تخصيص جدول الحروف"
+                }) { Text("حفظ") }
+            }
+            if (savedCodeTable != null) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "الجدول المحفوظ حالياً: CP$savedCodeTable",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Bold
+                )
             }
 
             statusMessage?.let {

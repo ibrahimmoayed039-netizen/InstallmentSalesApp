@@ -17,10 +17,23 @@ class PrinterManager(context: Context) {
     private val bluetoothManager = BluetoothPrinterManager(context)
     private val usbManager = UsbPrinterManager(context)
 
+    private val prefs = context.getSharedPreferences("printer_settings", Context.MODE_PRIVATE)
+
     private val _connectionType = MutableStateFlow(PrinterConnectionType.NONE)
     val connectionType: StateFlow<PrinterConnectionType> = _connectionType
 
     var paperWidth: PaperWidth = PaperWidth.MM80
+
+    /** رقم جدول الحروف (Code Page) الذي أثبت أنه يطبع العربية بشكل صحيح على هذه الطابعة، إن وُجد */
+    private val _codeTable = MutableStateFlow(prefs.getInt(KEY_CODE_TABLE, -1).takeIf { it >= 0 })
+    val codeTable: StateFlow<Int?> = _codeTable
+
+    fun setCodeTable(n: Int?) {
+        _codeTable.value = n
+        prefs.edit().apply {
+            if (n == null) remove(KEY_CODE_TABLE) else putInt(KEY_CODE_TABLE, n)
+        }.apply()
+    }
 
     fun pairedBluetoothDevices(): List<BluetoothDevice> = bluetoothManager.pairedPrinters()
     fun connectedUsbDevices(): List<UsbDevice> = usbManager.connectedPrinters()
@@ -45,9 +58,8 @@ class PrinterManager(context: Context) {
         _connectionType.value = PrinterConnectionType.NONE
     }
 
-    /** يطبع الوصل فعلياً عبر نوع الاتصال الحالي (بلوتوث أو USB) */
-    suspend fun print(data: ReceiptData): Boolean {
-        val bytes = ReceiptBuilder.build(data, paperWidth.charsPerLine)
+    /** إرسال بايتات جاهزة مباشرة عبر نوع الاتصال الحالي (مستخدم في اختبار جداول الحروف) */
+    suspend fun printRawBytes(bytes: ByteArray): Boolean {
         return when (_connectionType.value) {
             PrinterConnectionType.BLUETOOTH -> bluetoothManager.printBytes(bytes)
             PrinterConnectionType.USB -> usbManager.printBytes(bytes)
@@ -55,5 +67,21 @@ class PrinterManager(context: Context) {
         }
     }
 
+    /** يطبع ورقة اختبار تعرض نفس الجملة العربية أسفل كل رقم جدول حروف من CP0 إلى CP47 ثم CP255 */
+    suspend fun printCharacterTableTest(): Boolean {
+        val bytes = CodePageTestBuilder.build(paperWidth.charsPerLine)
+        return printRawBytes(bytes)
+    }
+
+    /** يطبع الوصل فعلياً عبر نوع الاتصال الحالي (بلوتوث أو USB) */
+    suspend fun print(data: ReceiptData): Boolean {
+        val bytes = ReceiptBuilder.build(data, paperWidth.charsPerLine, _codeTable.value)
+        return printRawBytes(bytes)
+    }
+
     fun isConnected(): Boolean = _connectionType.value != PrinterConnectionType.NONE
+
+    companion object {
+        private const val KEY_CODE_TABLE = "code_table"
+    }
 }

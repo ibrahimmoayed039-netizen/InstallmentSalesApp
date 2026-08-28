@@ -23,6 +23,16 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
 
     fun bold(on: Boolean): EscPosBuilder { buffer.write(byteArrayOf(0x1B, 0x45, if (on) 0x01 else 0x00)); return this }
 
+    /**
+     * ESC t n — يختار جدول الحروف (Code Page) المستخدم داخل الطابعة نفسها.
+     * كل طابعة تُرقّم جداولها بشكل مختلف، لذا نفس البايتات المُرسلة (CP864) قد تظهر
+     * كعربي صحيح تحت رقم جدول معيّن، وكرموز غير مفهومة تحت رقم آخر.
+     */
+    fun selectCharacterTable(n: Int): EscPosBuilder {
+        buffer.write(byteArrayOf(0x1B, 0x74, n.toByte()))
+        return this
+    }
+
     fun doubleHeight(on: Boolean): EscPosBuilder {
         buffer.write(byteArrayOf(0x1D, 0x21, if (on) 0x11 else 0x00))
         return this
@@ -63,4 +73,30 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
     }
 
     fun build(): ByteArray = buffer.toByteArray()
+}
+
+/**
+ * يبني ورقة اختبار تطبع نفس الجملة العربية تحت كل جدول حروف (Code Page) على حدة،
+ * بدءاً من CP0 وحتى CP47، ثم CP255 (القيمة الخاصة المستخدمة في كثير من طابعات Epson/OEM
+ * الرخيصة لجدول العربية WPC1256/Arabic). يقارن المستخدم الأسطر ليجد الرقم الذي تظهر تحته
+ * الجملة بشكل عربي صحيح، ثم يستخدم هذا الرقم بشكل دائم عبر الإعدادات.
+ */
+object CodePageTestBuilder {
+    private val sampleText = "اختبار الحروف العربية ١٢٣"
+
+    /** كل أرقام جداول الحروف الشائعة التي يجب تجربتها: 0 إلى 47، ثم 255 */
+    val testedTables: List<Int> = (0..47) + 255
+
+    fun build(charsPerLine: Int = 32): ByteArray {
+        val builder = EscPosBuilder(charsPerLine).init().alignLeft()
+        testedTables.forEach { n ->
+            builder.selectCharacterTable(n)
+            builder.text("CP$n: $sampleText")
+        }
+        // إعادة الطابعة لجدول الحروف الافتراضي (0) بعد الاختبار
+        builder.selectCharacterTable(0)
+        builder.feed(3)
+        builder.cut()
+        return builder.build()
+    }
 }

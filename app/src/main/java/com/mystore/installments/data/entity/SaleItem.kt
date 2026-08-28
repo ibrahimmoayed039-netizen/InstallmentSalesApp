@@ -8,6 +8,7 @@ import androidx.room.PrimaryKey
 data class SaleItem(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val saleId: Long,
+    val productId: Long? = null, // ربط بالمنتج في المخزون (اختياري لدعم أصناف يدوية قديمة)
     val name: String,
     val quantity: Int,
     val price: Double
