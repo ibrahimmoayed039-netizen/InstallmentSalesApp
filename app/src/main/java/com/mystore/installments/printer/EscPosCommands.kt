@@ -81,6 +81,24 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
  * الرخيصة لجدول العربية WPC1256/Arabic). يقارن المستخدم الأسطر ليجد الرقم الذي تظهر تحته
  * الجملة بشكل عربي صحيح، ثم يستخدم هذا الرقم بشكل دائم عبر الإعدادات.
  */
+/**
+ * أداة مساعدة لتحويل نص أوامر ESC/POS مكتوب بصيغة hex (مثال: "1B 40 1B 61 01")
+ * إلى بايتات جاهزة للإرسال مباشرة للطابعة. تُستخدم في شاشة الإعدادات للسماح
+ * للمستخدم بتجربة أو تغيير أوامر الطباعة الخام يدوياً دون تعديل الكود.
+ */
+object RawCommandParser {
+    /** يُرجع null إذا كان النص فارغاً أو يحتوي على قيمة hex غير صالحة */
+    fun parse(input: String): ByteArray? {
+        val tokens = input.trim().split(Regex("[\\s,]+")).filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return null
+        return try {
+            ByteArray(tokens.size) { i -> tokens[i].removePrefix("0x").removePrefix("0X").toInt(16).toByte() }
+        } catch (e: NumberFormatException) {
+            null
+        }
+    }
+}
+
 object CodePageTestBuilder {
     private val sampleText = "اختبار الحروف العربية ١٢٣"
 

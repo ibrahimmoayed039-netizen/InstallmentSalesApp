@@ -37,6 +37,10 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     val unpaidInstallments: StateFlow<List<Installment>> =
         repository.getUnpaidInstallments().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    // نفس الأقساط غير المسددة لكن مربوطة باسم وهاتف العميل، لعرض متابعة الأقساط مجمّعة على العميل
+    val unpaidInstallmentsWithCustomer: StateFlow<List<InstallmentWithCustomer>> =
+        repository.getUnpaidInstallmentsWithCustomer().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun addCustomer(name: String, phone: String, address: String, onDone: (Long) -> Unit = {}) {
         viewModelScope.launch {
             val id = repository.addCustomer(Customer(name = name, phone = phone, address = address))

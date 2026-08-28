@@ -40,6 +40,12 @@ class PrinterManager(context: Context) {
     fun hasUsbPermission(device: UsbDevice) = usbManager.hasPermission(device)
     fun requestUsbPermission(device: UsbDevice) = usbManager.requestPermission(device)
 
+    /** بحث مباشر عن أجهزة بلوتوث قريبة (زر "بحث عن طابعة") */
+    fun startBluetoothDiscovery(onDeviceFound: (BluetoothDevice) -> Unit, onFinished: () -> Unit) =
+        bluetoothManager.startDiscovery(onDeviceFound, onFinished)
+
+    fun stopBluetoothDiscovery() = bluetoothManager.stopDiscovery()
+
     suspend fun connectBluetooth(device: BluetoothDevice): Boolean {
         val ok = bluetoothManager.connect(device)
         if (ok) _connectionType.value = PrinterConnectionType.BLUETOOTH

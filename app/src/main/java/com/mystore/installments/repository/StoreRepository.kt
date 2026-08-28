@@ -44,6 +44,7 @@ class StoreRepository(
     fun getAllInstallments(): Flow<List<Installment>> = installmentDao.getAll()
     fun getOverdueInstallments(): Flow<List<Installment>> = installmentDao.getOverdue(System.currentTimeMillis())
     fun getUnpaidInstallments(): Flow<List<Installment>> = installmentDao.getUnpaid()
+    fun getUnpaidInstallmentsWithCustomer(): Flow<List<InstallmentWithCustomer>> = installmentDao.getUnpaidWithCustomer()
 
     /**
      * إنشاء عملية بيع بالتقسيط جديدة كاملة:

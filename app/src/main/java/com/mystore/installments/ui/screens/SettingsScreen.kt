@@ -1,6 +1,12 @@
 package com.mystore.installments.ui.screens
 
+import android.Manifest
 import android.annotation.SuppressLint
+import android.bluetooth.BluetoothDevice
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -11,14 +17,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.mystore.installments.printer.PaperWidth
 import com.mystore.installments.printer.PrinterConnectionType
+import com.mystore.installments.printer.RawCommandParser
 import com.mystore.installments.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 
 /**
  * شاشة إعدادات الطابعة: اختيار عرض الورق (58/80مم)، ثم الاتصال إما عبر
- * البلوتوث (من الأجهزة المقترنة مسبقاً) أو عبر USB (كابل OTG).
+ * البلوتوث (من الأجهزة المقترنة مسبقاً أو عبر البحث المباشر) أو عبر USB (كابل OTG).
+ *
+ * مهم: صلاحيات BLUETOOTH_CONNECT / BLUETOOTH_SCAN مطلوبة إجبارياً وقت التشغيل
+ * على أندرويد 12+ (API 31+)، وبدونها كانت الشاشة تتعطّل فوراً عند الدخول لأن
+ * قراءة الأجهزة المقترنة كانت تُستدعى مباشرة دون طلب الصلاحية أولاً. الآن تُطلب
+ * الصلاحية أولاً، وتُعرض الأجهزة فقط بعد منحها.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @SuppressLint("MissingPermission")
@@ -32,6 +45,63 @@ fun SettingsScreen(viewModel: AppViewModel) {
     var paperWidth by remember { mutableStateOf(PaperWidth.MM80) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
     var codeTableInput by remember(savedCodeTable) { mutableStateOf(savedCodeTable?.toString() ?: "") }
+    var customCommandInput by remember { mutableStateOf("") }
+
+    // ---------- إدارة صلاحيات البلوتوث وقت التشغيل ----------
+    val requiredBtPermissions = remember {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            arrayOf(Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN)
+        } else {
+            arrayOf(Manifest.permission.ACCESS_FINE_LOCATION)
+        }
+    }
+    fun hasBtPermissions(): Boolean = requiredBtPermissions.all {
+        ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
+    }
+    var btPermissionGranted by remember { mutableStateOf(hasBtPermissions()) }
+    val permissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestMultiplePermissions()
+    ) { results ->
+        btPermissionGranted = results.values.all { it }
+        if (!btPermissionGranted) {
+            statusMessage = "لم تُمنح صلاحية البلوتوث؛ لن تظهر الأجهزة المقترنة أو نتائج البحث"
+        }
+    }
+    // نطلب الصلاحية تلقائياً عند فتح الشاشة إن لم تكن ممنوحة بعد
+    LaunchedEffect(Unit) {
+        if (!btPermissionGranted) permissionLauncher.launch(requiredBtPermissions)
+    }
+
+    // إعادة قراءة الأجهزة المقترنة فقط بعد التأكد من منح الصلاحية
+    var pairedDevices by remember { mutableStateOf(emptyList<BluetoothDevice>()) }
+    LaunchedEffect(btPermissionGranted) {
+        pairedDevices = if (btPermissionGranted) viewModel.printerManager.pairedBluetoothDevices() else emptyList()
+    }
+
+    // ---------- البحث المباشر عن طابعات بلوتوث قريبة ----------
+    var isScanning by remember { mutableStateOf(false) }
+    var discoveredDevices by remember { mutableStateOf(listOf<BluetoothDevice>()) }
+    val pairedAddresses = remember(pairedDevices) { pairedDevices.map { it.address }.toSet() }
+
+    fun startScan() {
+        if (!btPermissionGranted) {
+            permissionLauncher.launch(requiredBtPermissions)
+            return
+        }
+        discoveredDevices = emptyList()
+        isScanning = true
+        viewModel.printerManager.startBluetoothDiscovery(
+            onDeviceFound = { device ->
+                if (device.address !in pairedAddresses && discoveredDevices.none { it.address == device.address }) {
+                    discoveredDevices = discoveredDevices + device
+                }
+            },
+            onFinished = { isScanning = false }
+        )
+    }
+    DisposableEffect(Unit) {
+        onDispose { viewModel.printerManager.stopBluetoothDiscovery() }
+    }
 
     Scaffold(topBar = { TopAppBar(title = { Text("إعدادات الطابعة") }) }) { padding ->
         Column(modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp)) {
@@ -65,27 +135,79 @@ fun SettingsScreen(viewModel: AppViewModel) {
                 TextButton(onClick = { viewModel.printerManager.disconnect() }) { Text("قطع الاتصال") }
             }
 
+            if (!btPermissionGranted) {
+                Spacer(Modifier.height(8.dp))
+                Card {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("يحتاج التطبيق صلاحية البلوتوث لعرض الطابعات والاتصال بها.")
+                        Spacer(Modifier.height(6.dp))
+                        Button(onClick = { permissionLauncher.launch(requiredBtPermissions) }) {
+                            Text("منح صلاحية البلوتوث")
+                        }
+                    }
+                }
+            }
+
             Spacer(Modifier.height(12.dp))
-            Text("الاتصال عبر البلوتوث", style = MaterialTheme.typography.titleMedium)
-            Text("قم بإقران الطابعة أولاً من إعدادات بلوتوث الهاتف، ثم اختَرها من القائمة:",
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                Text("الاتصال عبر البلوتوث", style = MaterialTheme.typography.titleMedium)
+                if (isScanning) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                        Spacer(Modifier.width(6.dp))
+                        Text("جارٍ البحث...", style = MaterialTheme.typography.bodySmall)
+                    }
+                } else {
+                    TextButton(onClick = { startScan() }) { Text("🔍 بحث عن طابعة") }
+                }
+            }
+            Text("قم بإقران الطابعة أولاً من إعدادات بلوتوث الهاتف، أو اضغط \"بحث عن طابعة\" لاكتشافها مباشرة:",
                 style = MaterialTheme.typography.bodyMedium)
 
-            val bluetoothDevices = remember { viewModel.printerManager.pairedBluetoothDevices() }
-            LazyColumn(modifier = Modifier.heightIn(max = 180.dp)) {
-                items(bluetoothDevices) { device ->
-                    ListItem(
-                        headlineContent = { Text(device.name ?: device.address) },
-                        supportingContent = { Text(device.address) },
-                        trailingContent = {
-                            Button(onClick = {
-                                scope.launch {
-                                    val ok = viewModel.printerManager.connectBluetooth(device)
-                                    statusMessage = if (ok) "تم الاتصال بنجاح" else "فشل الاتصال بالطابعة"
-                                }
-                            }) { Text("اتصال") }
-                        }
-                    )
+            if (pairedDevices.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("الأجهزة المقترنة", style = MaterialTheme.typography.labelLarge)
+                LazyColumn(modifier = Modifier.heightIn(max = 160.dp)) {
+                    items(pairedDevices) { device ->
+                        ListItem(
+                            headlineContent = { Text(device.name ?: device.address) },
+                            supportingContent = { Text(device.address) },
+                            trailingContent = {
+                                Button(onClick = {
+                                    scope.launch {
+                                        val ok = viewModel.printerManager.connectBluetooth(device)
+                                        statusMessage = if (ok) "تم الاتصال بنجاح" else "فشل الاتصال بالطابعة"
+                                    }
+                                }) { Text("اتصال") }
+                            }
+                        )
+                    }
                 }
+            }
+
+            if (discoveredDevices.isNotEmpty()) {
+                Spacer(Modifier.height(6.dp))
+                Text("أجهزة مكتشَفة قريبة (غير مقترنة)", style = MaterialTheme.typography.labelLarge)
+                LazyColumn(modifier = Modifier.heightIn(max = 160.dp)) {
+                    items(discoveredDevices) { device ->
+                        ListItem(
+                            headlineContent = { Text(device.name ?: "جهاز غير معروف") },
+                            supportingContent = { Text(device.address) },
+                            trailingContent = {
+                                Button(onClick = {
+                                    scope.launch {
+                                        viewModel.printerManager.stopBluetoothDiscovery()
+                                        isScanning = false
+                                        val ok = viewModel.printerManager.connectBluetooth(device)
+                                        statusMessage = if (ok) "تم الاتصال بنجاح" else "فشل الاتصال؛ قد تحتاج لإقران الجهاز أولاً من إعدادات الهاتف"
+                                    }
+                                }) { Text("اتصال") }
+                            }
+                        )
+                    }
+                }
+            } else if (!isScanning && pairedDevices.isEmpty() && btPermissionGranted) {
+                Text("لا توجد أجهزة مقترنة، اضغط \"بحث عن طابعة\" لاكتشافها.", style = MaterialTheme.typography.bodySmall)
             }
 
             Spacer(Modifier.height(12.dp))
@@ -163,6 +285,42 @@ fun SettingsScreen(viewModel: AppViewModel) {
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Bold
                 )
+            }
+
+            HorizontalDivider(Modifier.padding(vertical = 12.dp))
+
+            // ---------- إرسال/تغيير أوامر طباعة مخصّصة (متقدّم) ----------
+            Text("أوامر طباعة مخصّصة (متقدّم)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "لتجربة أو تغيير أوامر ESC/POS الخام يدوياً: اكتب البايتات بصيغة hex مفصولة بمسافات، " +
+                    "مثال: 1B 40 1B 61 01 (تهيئة الطابعة ثم توسيط النص).",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = customCommandInput,
+                onValueChange = { customCommandInput = it },
+                label = { Text("أمر hex، مثال: 1B 40") },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+            Spacer(Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    val bytes = RawCommandParser.parse(customCommandInput)
+                    if (bytes == null) {
+                        statusMessage = "صيغة الأمر غير صحيحة، تأكد من كتابته بصيغة hex مفصولة بمسافات"
+                    } else {
+                        scope.launch {
+                            val ok = viewModel.printerManager.printRawBytes(bytes)
+                            statusMessage = if (ok) "تم إرسال الأمر المخصّص للطابعة" else "الطابعة غير متصلة، اتصل بها أولاً"
+                        }
+                    }
+                },
+                enabled = connectionType != PrinterConnectionType.NONE,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("إرسال الأمر المخصّص")
             }
 
             statusMessage?.let {
