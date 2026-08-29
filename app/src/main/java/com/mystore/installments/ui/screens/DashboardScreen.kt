@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import com.mystore.installments.ui.components.AppBottomBar
 import com.mystore.installments.ui.nav.Routes
+import com.mystore.installments.util.formatAmount
 import com.mystore.installments.viewmodel.AppViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -63,7 +64,7 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
                     )
                     SummaryCard(
                         title = "مبالغ مستحقة",
-                        value = "%.0f".format(totalOutstanding),
+                        value = formatAmount(totalOutstanding),
                         modifier = Modifier.weight(1f),
                         color = Color(0xFF2E7D32)
                     )
@@ -72,7 +73,7 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
             item {
                 SummaryCard(
                     title = "أقساط متأخرة (${overdue.size})",
-                    value = "%.0f".format(totalOverdue),
+                    value = formatAmount(totalOverdue),
                     modifier = Modifier.fillMaxWidth(),
                     color = Color(0xFFC62828)
                 )
@@ -107,7 +108,7 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
                                 )
                             }
                             Icon(Icons.Filled.Warning, contentDescription = null, tint = Color(0xFFC62828))
-                            Text("%.0f".format(inst.amount - inst.paidAmount), fontWeight = FontWeight.Bold)
+                            Text(formatAmount(inst.amount - inst.paidAmount), fontWeight = FontWeight.Bold)
                         }
                     }
                 }

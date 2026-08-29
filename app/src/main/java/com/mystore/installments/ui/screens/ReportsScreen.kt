@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.mystore.installments.data.entity.InstallmentStatus
+import com.mystore.installments.util.formatAmount
 import com.mystore.installments.viewmodel.AppViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -26,9 +27,9 @@ fun ReportsScreen(viewModel: AppViewModel) {
             modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ReportRow("إجمالي قيمة المبيعات", "%.0f".format(totalSalesValue))
-            ReportRow("إجمالي المُحصَّل (مقدمات + أقساط)", "%.0f".format(totalCollected))
-            ReportRow("إجمالي المبالغ المتبقية", "%.0f".format(totalRemaining))
+            ReportRow("إجمالي قيمة المبيعات", formatAmount(totalSalesValue))
+            ReportRow("إجمالي المُحصَّل (مقدمات + أقساط)", formatAmount(totalCollected))
+            ReportRow("إجمالي المبالغ المتبقية", formatAmount(totalRemaining))
             ReportRow("عدد الأقساط المتأخرة", overdueCount.toString())
             ReportRow("عدد عمليات البيع", sales.size.toString())
         }

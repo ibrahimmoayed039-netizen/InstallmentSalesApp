@@ -19,10 +19,12 @@ import com.mystore.installments.data.entity.Customer
 import com.mystore.installments.data.entity.Product
 import com.mystore.installments.data.entity.SaleItem
 import com.mystore.installments.printer.ReceiptData
+import com.mystore.installments.printer.ReceiptItemLine
 import com.mystore.installments.printer.ReceiptLine
 import com.mystore.installments.ui.components.AppBottomBar
 import com.mystore.installments.ui.components.PinDialog
 import com.mystore.installments.ui.nav.Routes
+import com.mystore.installments.util.formatAmount
 import com.mystore.installments.viewmodel.AppViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -198,7 +200,7 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${item.name} × ${item.quantity} = %.0f".format(item.lineTotal))
+                        Text("${item.name} × ${item.quantity} = ${formatAmount(item.lineTotal)}")
                         IconButton(onClick = { cartItems.remove(item) }) {
                             Icon(Icons.Filled.Delete, contentDescription = "حذف")
                         }
@@ -207,7 +209,7 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
             }
 
             HorizontalDivider(Modifier.padding(vertical = 8.dp))
-            Text("إجمالي الأصناف: %.0f".format(grossTotal), style = MaterialTheme.typography.bodyMedium)
+            Text("إجمالي الأصناف: ${formatAmount(grossTotal)}", style = MaterialTheme.typography.bodyMedium)
 
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
                 OutlinedTextField(
@@ -230,7 +232,7 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                     modifier = Modifier.weight(1f)
                 )
             }
-            Text("الإجمالي بعد الخصم: %.0f".format(totalAmount), style = MaterialTheme.typography.titleMedium)
+            Text("الإجمالي بعد الخصم: ${formatAmount(totalAmount)}", style = MaterialTheme.typography.titleMedium)
 
             Row(Modifier.padding(top = 8.dp)) {
                 OutlinedTextField(
@@ -261,19 +263,19 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                         ) { saleId ->
                             val installmentAmount = (totalAmount - down) / count
                             val receiptLines = mutableListOf(
-                                ReceiptLine("إجمالي الأصناف", "%.0f".format(grossTotal))
+                                ReceiptLine("إجمالي الأصناف", formatAmount(grossTotal))
                             )
-                            if (discount > 0) receiptLines.add(ReceiptLine("الخصم", "%.0f".format(discount)))
-                            receiptLines.add(ReceiptLine("الإجمالي بعد الخصم", "%.0f".format(totalAmount)))
-                            receiptLines.add(ReceiptLine("الدفعة المقدمة", "%.0f".format(down)))
+                            if (discount > 0) receiptLines.add(ReceiptLine("الخصم", formatAmount(discount)))
+                            receiptLines.add(ReceiptLine("الإجمالي بعد الخصم", formatAmount(totalAmount)))
+                            receiptLines.add(ReceiptLine("الدفعة المقدمة", formatAmount(down)))
                             receiptLines.add(ReceiptLine("عدد الأقساط", count.toString()))
-                            receiptLines.add(ReceiptLine("قيمة القسط الشهري", "%.0f".format(installmentAmount), bold = true))
+                            receiptLines.add(ReceiptLine("قيمة القسط الشهري", formatAmount(installmentAmount), bold = true))
                             val receipt = ReceiptData(
                                 storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
                                 title = "فاتورة بيع بالتقسيط رقم $saleId",
                                 customerName = customer.name,
                                 customerPhone = customer.phone,
-                                itemsSummary = cartItems.map { "${it.name} × ${it.quantity} = %.0f".format(it.lineTotal) },
+                                itemsSummary = cartItems.map { ReceiptItemLine("${it.name} × ${it.quantity}", formatAmount(it.lineTotal)) },
                                 lines = receiptLines
                             )
                             viewModel.setPendingReceipt(receipt)

@@ -1,11 +1,16 @@
 package com.mystore.installments.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -14,10 +19,13 @@ import com.mystore.installments.data.entity.Customer
 import com.mystore.installments.data.entity.Installment
 import com.mystore.installments.data.entity.InstallmentStatus
 import com.mystore.installments.data.entity.Sale
+import com.mystore.installments.data.entity.SaleStatus
 import com.mystore.installments.printer.ReceiptData
+import com.mystore.installments.printer.ReceiptItemLine
 import com.mystore.installments.printer.ReceiptLine
 import com.mystore.installments.ui.components.PayInstallmentDialog
 import com.mystore.installments.ui.nav.Routes
+import com.mystore.installments.util.formatAmount
 import com.mystore.installments.viewmodel.AppViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -87,19 +95,19 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
                             val items = viewModel.repository.getSaleItems(s.id)
                             val lines = mutableListOf<ReceiptLine>()
                             if (s.discount > 0) {
-                                lines.add(ReceiptLine("إجمالي الأصناف", "%.0f".format(s.totalAmount + s.discount)))
-                                lines.add(ReceiptLine("الخصم", "%.0f".format(s.discount)))
+                                lines.add(ReceiptLine("إجمالي الأصناف", formatAmount(s.totalAmount + s.discount)))
+                                lines.add(ReceiptLine("الخصم", formatAmount(s.discount)))
                             }
-                            lines.add(ReceiptLine("الإجمالي", "%.0f".format(s.totalAmount)))
-                            lines.add(ReceiptLine("الدفعة المقدمة", "%.0f".format(s.downPayment)))
+                            lines.add(ReceiptLine("الإجمالي", formatAmount(s.totalAmount)))
+                            lines.add(ReceiptLine("الدفعة المقدمة", formatAmount(s.downPayment)))
                             lines.add(ReceiptLine("عدد الأقساط", s.numberOfInstallments.toString()))
-                            lines.add(ReceiptLine("قيمة القسط", "%.0f".format(s.installmentAmount), bold = true))
+                            lines.add(ReceiptLine("قيمة القسط", formatAmount(s.installmentAmount), bold = true))
                             val receipt = ReceiptData(
                                 storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
                                 title = "فاتورة بيع بالتقسيط رقم ${s.id}",
                                 customerName = cust.name,
                                 customerPhone = cust.phone,
-                                itemsSummary = items.map { "${it.name} × ${it.quantity} = ${"%.0f".format(it.lineTotal)}" },
+                                itemsSummary = items.map { ReceiptItemLine("${it.name} × ${it.quantity}", formatAmount(it.lineTotal)) },
                                 lines = lines
                             )
                             viewModel.setPendingReceipt(receipt)
@@ -132,14 +140,14 @@ private fun buildStatementReceipt(
     customer: Customer,
     saleGroups: List<Pair<Sale, List<Installment>>>
 ): ReceiptData {
-    val itemsSummary = mutableListOf<String>()
+    val itemsSummary = mutableListOf<ReceiptItemLine>()
     var totalSold = 0.0
     var totalPaid = 0.0
     var totalRemaining = 0.0
 
     saleGroups.forEach { (sale, installments) ->
-        itemsSummary.add("── فاتورة #${sale.id} — ${sale.status} ──")
-        itemsSummary.add("الإجمالي: %.0f  •  المقدم: %.0f".format(sale.totalAmount, sale.downPayment))
+        itemsSummary.add(ReceiptItemLine("فاتورة #${sale.id} — ${sale.status}"))
+        itemsSummary.add(ReceiptItemLine("الإجمالي ${formatAmount(sale.totalAmount)} • المقدم", formatAmount(sale.downPayment)))
         installments.forEach { inst ->
             val dateStr = SimpleDateFormat("yyyy-MM-dd", Locale("ar")).format(Date(inst.dueDate))
             val statusLabel = when (inst.status) {
@@ -147,7 +155,12 @@ private fun buildStatementReceipt(
                 InstallmentStatus.LATE -> "متأخر"
                 InstallmentStatus.PENDING -> "غير مسدد"
             }
-            itemsSummary.add("قسط ${inst.installmentNumber} ($dateStr): %.0f/%.0f [$statusLabel]".format(inst.paidAmount, inst.amount))
+            itemsSummary.add(
+                ReceiptItemLine(
+                    "قسط ${inst.installmentNumber} ($dateStr) [$statusLabel]",
+                    "${formatAmount(inst.paidAmount)}/${formatAmount(inst.amount)}"
+                )
+            )
         }
         totalSold += sale.totalAmount
         val paidForSale = installments.sumOf { it.paidAmount } + sale.downPayment
@@ -163,11 +176,32 @@ private fun buildStatementReceipt(
         itemsSummary = itemsSummary,
         lines = listOf(
             ReceiptLine("عدد الفواتير", saleGroups.size.toString()),
-            ReceiptLine("إجمالي المبيعات", "%.0f".format(totalSold)),
-            ReceiptLine("إجمالي المُحصَّل", "%.0f".format(totalPaid)),
-            ReceiptLine("إجمالي المتبقي", "%.0f".format(totalRemaining), bold = true)
+            ReceiptLine("إجمالي المبيعات", formatAmount(totalSold)),
+            ReceiptLine("إجمالي المُحصَّل", formatAmount(totalPaid)),
+            ReceiptLine("إجمالي المتبقي", formatAmount(totalRemaining), bold = true)
         )
     )
+}
+
+/** لون يدل على حالة الفاتورة بلمحة سريعة: أحمر لوجود قسط متأخر، أخضر لفاتورة مكتملة، رمادي لملغاة، وإلا اللون الأساسي (نشطة) */
+private fun saleStatusColor(sale: Sale, installments: List<Installment>): Color {
+    val hasLate = installments.any { it.status == InstallmentStatus.LATE }
+    return when {
+        hasLate -> Color(0xFFC62828)
+        sale.status == SaleStatus.COMPLETED -> Color(0xFF2E7D32)
+        sale.status == SaleStatus.CANCELLED -> Color(0xFF9E9E9E)
+        else -> Color(0xFF1565C0)
+    }
+}
+
+private fun saleStatusLabel(sale: Sale, installments: List<Installment>): String {
+    val hasLate = installments.any { it.status == InstallmentStatus.LATE }
+    return when {
+        hasLate -> "يوجد قسط متأخر"
+        sale.status == SaleStatus.COMPLETED -> "مكتملة"
+        sale.status == SaleStatus.CANCELLED -> "ملغاة"
+        else -> "نشطة"
+    }
 }
 
 @Composable
@@ -181,35 +215,79 @@ private fun SaleCard(
     val installments by installmentsFlow.collectAsStateWithLifecycle(initialValue = emptyList())
     var expanded by remember { mutableStateOf(false) }
 
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(14.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text("فاتورة #${sale.id} — الإجمالي %.0f".format(sale.totalAmount), fontWeight = FontWeight.Bold)
-                TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "إخفاء" else "الأقساط") }
-            }
-            Text("الحالة: ${sale.status}", style = MaterialTheme.typography.bodyMedium)
-            TextButton(onClick = { onPrintInvoice(sale) }) { Text("طباعة الفاتورة") }
+    val statusColor = saleStatusColor(sale, installments)
+    val paidSoFar = sale.downPayment + installments.sumOf { it.paidAmount }
+    val progress = if (sale.totalAmount > 0) (paidSoFar / sale.totalAmount).toFloat().coerceIn(0f, 1f) else 0f
 
-            if (expanded) {
-                installments.forEach { inst ->
-                    Row(
-                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column {
-                            Text("قسط ${inst.installmentNumber}")
-                            Text(
-                                SimpleDateFormat("yyyy-MM-dd", Locale("ar")).format(Date(inst.dueDate)),
-                                style = MaterialTheme.typography.labelSmall
-                            )
-                        }
-                        Text("%.0f / %.0f".format(inst.paidAmount, inst.amount))
-                        if (inst.status != InstallmentStatus.PAID) {
-                            Button(onClick = { onPay(inst) }, contentPadding = PaddingValues(horizontal = 10.dp)) {
-                                Text("تسديد")
+    ElevatedCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        // شريط لوني جانبي رفيع يعكس حالة الفاتورة بلمحة سريعة دون الحاجة لقراءة أي نص
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+            Box(
+                Modifier
+                    .fillMaxHeight()
+                    .width(5.dp)
+                    .background(statusColor)
+            )
+            Column(Modifier.weight(1f).padding(14.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text("فاتورة #${sale.id} — الإجمالي ${formatAmount(sale.totalAmount)}", fontWeight = FontWeight.Bold)
+                    TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "إخفاء" else "الأقساط") }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        Modifier
+                            .size(8.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(statusColor)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(saleStatusLabel(sale, installments), style = MaterialTheme.typography.bodyMedium)
+                }
+
+                Spacer(Modifier.height(8.dp))
+                // شريط تقدّم يوضح نسبة ما تم سداده من إجمالي الفاتورة بلمحة بصرية سريعة
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
+                    color = statusColor,
+                    trackColor = statusColor.copy(alpha = 0.15f)
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "تم سداد ${formatAmount(paidSoFar)} من ${formatAmount(sale.totalAmount)} (${(progress * 100).toInt()}%)",
+                    style = MaterialTheme.typography.labelSmall
+                )
+
+                TextButton(onClick = { onPrintInvoice(sale) }) { Text("طباعة الفاتورة") }
+
+                if (expanded) {
+                    installments.forEach { inst ->
+                        Row(
+                            Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("قسط ${inst.installmentNumber}")
+                                Text(
+                                    SimpleDateFormat("yyyy-MM-dd", Locale("ar")).format(Date(inst.dueDate)),
+                                    style = MaterialTheme.typography.labelSmall
+                                )
                             }
-                        } else {
-                            AssistChip(onClick = {}, label = { Text("مسدد") })
+                            Text("${formatAmount(inst.paidAmount)} / ${formatAmount(inst.amount)}")
+                            if (inst.status != InstallmentStatus.PAID) {
+                                Button(onClick = { onPay(inst) }, contentPadding = PaddingValues(horizontal = 10.dp)) {
+                                    Text("تسديد")
+                                }
+                            } else {
+                                AssistChip(onClick = {}, label = { Text("مسدد") })
+                            }
                         }
                     }
                 }

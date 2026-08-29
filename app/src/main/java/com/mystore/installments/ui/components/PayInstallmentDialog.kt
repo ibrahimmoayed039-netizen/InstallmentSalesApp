@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mystore.installments.printer.ReceiptData
 import com.mystore.installments.printer.ReceiptLine
+import com.mystore.installments.util.formatAmount
 import com.mystore.installments.viewmodel.AppViewModel
 
 /**
@@ -31,7 +32,7 @@ fun PayInstallmentDialog(
         title = { Text("تسديد القسط رقم $installmentNumber") },
         text = {
             Column {
-                Text("المتبقي على هذا القسط: %.0f".format(remaining))
+                Text("المتبقي على هذا القسط: ${formatAmount(remaining)}")
                 Spacer(Modifier.height(8.dp))
                 OutlinedTextField(
                     value = amountText,
@@ -52,8 +53,8 @@ fun PayInstallmentDialog(
                             customerPhone = customerPhone,
                             lines = listOf(
                                 ReceiptLine("القسط رقم", installmentNumber.toString()),
-                                ReceiptLine("المبلغ المسدد", "%.0f".format(amount), bold = true),
-                                ReceiptLine("المتبقي على القسط", "%.0f".format((remaining - amount).coerceAtLeast(0.0)))
+                                ReceiptLine("المبلغ المسدد", formatAmount(amount), bold = true),
+                                ReceiptLine("المتبقي على القسط", formatAmount((remaining - amount).coerceAtLeast(0.0)))
                             )
                         )
                         viewModel.setPendingReceipt(receipt)

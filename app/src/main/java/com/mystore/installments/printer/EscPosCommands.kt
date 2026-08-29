@@ -51,16 +51,30 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
         return this
     }
 
-    /** خط فاصل بعرض السطر الكامل */
-    fun divider(char: Char = '-'): EscPosBuilder {
+    /** خط فاصل منقط بعرض السطر الكامل (بدل الشرطات المتصلة، أقرب لشكل الفواتير الحرارية الفعلية) */
+    fun divider(char: Char = '.'): EscPosBuilder {
         text(char.toString().repeat(charsPerLine))
         return this
     }
 
-    /** سطر بعنصرين: نص على اليمين وقيمة على اليسار (مناسب للواجهة العربية RTL) */
-    fun keyValue(label: String, value: String): EscPosBuilder {
-        val space = (charsPerLine - label.length - value.length).coerceAtLeast(1)
-        text(value + " ".repeat(space) + label)
+    /**
+     * سطر بعنصرين: نص على اليمين وقيمة على اليسار (مناسب للواجهة العربية RTL).
+     * القيمة تُحاذى داخل عمود ثابت العرض (valueWidth) من جهة اليمين، بحيث تتراصف كل
+     * الأرقام (آحاد تحت آحاد، عشرات تحت عشرات...) عبر كل أسطر الفاتورة بدل أن تبدأ
+     * كل قيمة من نفس نقطة البداية فقط دون محاذاة فعلية للأرقام نفسها.
+     */
+    fun keyValue(label: String, value: String, valueWidth: Int = 12): EscPosBuilder {
+        text(formatKeyValue(label, value, charsPerLine, valueWidth))
+        return this
+    }
+
+    /**
+     * سطر عنصر مع مبلغ: اسم الصنف (يُقصّ إن طال) يليه المبلغ محاذى لعمود ثابت من اليمين،
+     * بنفس فكرة keyValue، مخصص لقوائم الأصناف/الأقساط الطويلة كي تصطف أرقامها بانتظام
+     * تحت بعضها بغض النظر عن اختلاف طول أسماء الأصناف.
+     */
+    fun itemLine(name: String, amount: String?, amountWidth: Int = 12): EscPosBuilder {
+        text(formatItemLine(name, amount, charsPerLine, amountWidth))
         return this
     }
 
@@ -117,6 +131,25 @@ class EscPosBuilder(private val charsPerLine: Int = 48) { // 48 حرفاً لع�
     }
 
     fun build(): ByteArray = buffer.toByteArray()
+
+    companion object {
+        /**
+         * منطق محاذاة "قيمة/مبلغ" مشترك بين الطباعة الفعلية وشاشة المعاينة، حتى تكون
+         * المعاينة مطابقة تماماً لما سيخرج من الطابعة (بما فيه محاذاة الأرقام).
+         */
+        fun formatKeyValue(label: String, value: String, charsPerLine: Int, valueWidth: Int = 12): String {
+            val paddedValue = value.take(valueWidth).padStart(valueWidth)
+            val labelSpace = (charsPerLine - valueWidth).coerceAtLeast(label.length)
+            return paddedValue + label.padStart(labelSpace)
+        }
+
+        fun formatItemLine(name: String, amount: String?, charsPerLine: Int, amountWidth: Int = 12): String {
+            if (amount == null) return name
+            val nameWidth = (charsPerLine - amountWidth - 1).coerceAtLeast(4)
+            val trimmedName = if (name.length > nameWidth) name.take(nameWidth - 1) + "…" else name
+            return trimmedName.padEnd(nameWidth) + " " + amount.take(amountWidth).padStart(amountWidth)
+        }
+    }
 }
 
 /**

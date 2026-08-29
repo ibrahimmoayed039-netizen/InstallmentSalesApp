@@ -1,15 +1,19 @@
 package com.mystore.installments.ui.screens
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
@@ -49,48 +53,60 @@ fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) 
                 Spacer(Modifier.height(10.dp))
             }
 
-            // ورقة المعاينة بنفس عرض الطابعة الحرارية تقريباً (محاكاة بصرية)
-            ElevatedCard(
+            // منطقة معاينة الورق: خلفية رمادية فاتحة تُبرز شريط الورق الأبيض في المنتصف،
+            // بحواف مسننة أعلى وأسفل لمحاكاة شكل الورق الحراري الفعلي عند قصّه من البكرة
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .background(Color(0xFFDCE0E3)),
+                contentAlignment = Alignment.TopCenter
             ) {
                 val data = receipt
                 if (data == null) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
-                        Text("لا يوجد وصل للمعاينة")
-                    }
+                    Text("لا يوجد وصل للمعاينة", modifier = Modifier.padding(24.dp))
                 } else {
                     val charsPerLine = viewModel.printerManager.paperWidth.charsPerLine
                     val previewLines = ReceiptBuilder.buildPreviewLines(data, charsPerLine)
                     val logoUri = viewModel.appSettings.storeLogoUri
-                    LazyColumn(
+
+                    Column(
                         modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.White)
-                            .padding(16.dp)
+                            .fillMaxWidth(0.88f)
+                            .fillMaxHeight()
+                            .padding(vertical = 10.dp)
                     ) {
-                        if (logoUri != null) {
-                            item {
-                                AsyncImage(
-                                    model = logoUri,
-                                    contentDescription = "شعار المحل",
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(90.dp)
-                                        .padding(bottom = 8.dp),
-                                    contentScale = ContentScale.Fit
+                        JaggedEdge(color = Color.White, pointingDown = false)
+                        LazyColumn(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxWidth()
+                                .background(Color.White)
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            if (logoUri != null) {
+                                item {
+                                    AsyncImage(
+                                        model = logoUri,
+                                        contentDescription = "شعار المحل",
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(90.dp)
+                                            .padding(bottom = 8.dp),
+                                        contentScale = ContentScale.Fit
+                                    )
+                                }
+                            }
+                            items(previewLines) { line ->
+                                Text(
+                                    text = line,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 13.sp,
+                                    color = Color.Black
                                 )
                             }
                         }
-                        items(previewLines) { line ->
-                            Text(
-                                text = line,
-                                fontFamily = FontFamily.Monospace,
-                                fontSize = 13.sp,
-                                color = Color.Black
-                            )
-                        }
+                        JaggedEdge(color = Color.White, pointingDown = true)
                     }
                 }
             }
@@ -121,5 +137,50 @@ fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) 
                 }
             }
         }
+    }
+}
+
+/**
+ * حافة مسننة بسيطة (خط "أسنان منشار") لمحاكاة شكل حافة الورق الحراري المقصوص من البكرة.
+ * pointingDown يحدد اتجاه الأسنان: false لحافة أعلى الورقة، true لحافة أسفلها.
+ */
+@Composable
+private fun JaggedEdge(
+    color: Color,
+    pointingDown: Boolean,
+    toothWidth: Dp = 12.dp,
+    toothHeight: Dp = 7.dp
+) {
+    Canvas(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(toothHeight)
+    ) {
+        val toothPx = toothWidth.toPx()
+        val heightPx = toothHeight.toPx()
+        val teethCount = (size.width / toothPx).toInt() + 2
+        val path = Path()
+
+        if (pointingDown) {
+            // حافة أسفل الورقة: مستوية من الأعلى، مسننة من الأسفل
+            path.moveTo(0f, 0f)
+            for (i in 0..teethCount) {
+                val x = (i * toothPx).coerceAtMost(size.width)
+                val y = if (i % 2 == 0) 0f else heightPx
+                path.lineTo(x, y)
+            }
+            path.lineTo(size.width, 0f)
+        } else {
+            // حافة أعلى الورقة: مسننة من الأعلى، مستوية من الأسفل
+            path.moveTo(0f, heightPx)
+            for (i in 0..teethCount) {
+                val x = (i * toothPx).coerceAtMost(size.width)
+                val y = if (i % 2 == 0) heightPx else 0f
+                path.lineTo(x, y)
+            }
+            path.lineTo(size.width, heightPx)
+        }
+        path.close()
+        drawPath(path, color)
     }
 }

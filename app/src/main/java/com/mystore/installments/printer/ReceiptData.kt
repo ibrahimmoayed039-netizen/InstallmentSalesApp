@@ -9,6 +9,13 @@ import java.util.Locale
 // بحيث تكون المعاينة مطابقة تماماً لما سيُطبع فعلياً
 data class ReceiptLine(val label: String, val value: String, val bold: Boolean = false)
 
+/**
+ * سطر ضمن قائمة الأصناف/الأقساط. إن كان amount غير فارغ، يُطبع الاسم مع محاذاة المبلغ
+ * لعمود ثابت من اليمين (لتصطف كل الأرقام تحت بعضها)، وإلا يُطبع النص وحده على كامل السطر
+ * (يُستخدم مثلاً لعناوين فرعية مثل رقم فاتورة ضمن كشف حساب).
+ */
+data class ReceiptItemLine(val text: String, val amount: String? = null)
+
 data class ReceiptData(
     val storeName: String,
     val title: String,                 // مثال: "وصل استلام دفعة" أو "فاتورة بيع بالتقسيط"
@@ -16,7 +23,7 @@ data class ReceiptData(
     val customerPhone: String,
     val date: Long = System.currentTimeMillis(),
     val lines: List<ReceiptLine>,       // تفاصيل (المبلغ، القسط رقم، المتبقي...)
-    val itemsSummary: List<String> = emptyList(), // أسطر عناصر البيع إن وجدت
+    val itemsSummary: List<ReceiptItemLine> = emptyList(), // أسطر عناصر البيع إن وجدت
     val footerNote: String = "شكراً لتعاملكم معنا"
 ) {
     fun formattedDate(): String =
@@ -53,7 +60,7 @@ object ReceiptBuilder {
             .divider()
 
         if (data.itemsSummary.isNotEmpty()) {
-            data.itemsSummary.forEach { b.text(it) }
+            data.itemsSummary.forEach { b.itemLine(it.text, it.amount) }
             b.divider()
         }
 
@@ -72,18 +79,19 @@ object ReceiptBuilder {
 
     /** يبني نص المعاينة (سطر بسطر) بنفس منطق الطباعة الفعلية، لعرضه قبل الإرسال للطابعة */
     fun buildPreviewLines(data: ReceiptData, charsPerLine: Int = 48): List<String> {
+        val divider = ".".repeat(charsPerLine)
         val lines = mutableListOf<String>()
         lines.add(data.storeName)
         lines.add(data.title)
-        lines.add("-".repeat(charsPerLine))
-        lines.add("العميل: ${data.customerName}")
-        lines.add("الهاتف: ${data.customerPhone}")
-        lines.add("التاريخ: ${data.formattedDate()}")
-        lines.add("-".repeat(charsPerLine))
-        lines.addAll(data.itemsSummary)
-        if (data.itemsSummary.isNotEmpty()) lines.add("-".repeat(charsPerLine))
-        data.lines.forEach { lines.add("${it.label}: ${it.value}") }
-        lines.add("-".repeat(charsPerLine))
+        lines.add(divider)
+        lines.add(EscPosBuilder.formatKeyValue("العميل", data.customerName, charsPerLine))
+        lines.add(EscPosBuilder.formatKeyValue("الهاتف", data.customerPhone, charsPerLine))
+        lines.add(EscPosBuilder.formatKeyValue("التاريخ", data.formattedDate(), charsPerLine))
+        lines.add(divider)
+        data.itemsSummary.forEach { lines.add(EscPosBuilder.formatItemLine(it.text, it.amount, charsPerLine)) }
+        if (data.itemsSummary.isNotEmpty()) lines.add(divider)
+        data.lines.forEach { lines.add(EscPosBuilder.formatKeyValue(it.label, it.value, charsPerLine)) }
+        lines.add(divider)
         lines.add(data.footerNote)
         return lines
     }

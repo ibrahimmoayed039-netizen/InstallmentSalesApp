@@ -24,6 +24,7 @@ import com.mystore.installments.viewmodel.AppViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.mystore.installments.util.formatAmount
 
 /**
  * متابعة الأقساط: تُعرض مجمّعة على اسم كل عميل. أقساط كل عميل مطوية (مخفية) افتراضياً
@@ -119,7 +120,7 @@ fun InstallmentsScreen(viewModel: AppViewModel, navController: NavController) {
                                     }
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Text(
-                                            "%.0f".format(totalRemaining),
+                                            formatAmount(totalRemaining),
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.Bold
                                         )
@@ -154,7 +155,7 @@ fun InstallmentsScreen(viewModel: AppViewModel, navController: NavController) {
                                         }
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                "%.0f".format(inst.amount - inst.paidAmount),
+                                                formatAmount(inst.amount - inst.paidAmount),
                                                 fontWeight = FontWeight.Bold,
                                                 color = if (isLate) Color(0xFFC62828) else MaterialTheme.colorScheme.primary
                                             )
