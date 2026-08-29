@@ -17,6 +17,16 @@ class AppSettings(context: Context) {
         get() = prefs.getString(KEY_STORE_NAME, "") ?: ""
         set(value) = prefs.edit().putString(KEY_STORE_NAME, value).apply()
 
+    /** عنوان المحل، يظهر تحت الاسم أعلى كل فاتورة إن كان معبّأً (اختياري) */
+    var storeAddress: String
+        get() = prefs.getString(KEY_STORE_ADDRESS, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_STORE_ADDRESS, value).apply()
+
+    /** هاتف المحل، يظهر أعلى الفاتورة إن كان معبّأً (اختياري) */
+    var storePhone: String
+        get() = prefs.getString(KEY_STORE_PHONE, "") ?: ""
+        set(value) = prefs.edit().putString(KEY_STORE_PHONE, value).apply()
+
     /** مسار (Uri) صورة شعار المحل، إن وُجدت */
     var storeLogoUri: String?
         get() = prefs.getString(KEY_STORE_LOGO, null)
@@ -45,6 +55,8 @@ class AppSettings(context: Context) {
 
     companion object {
         private const val KEY_STORE_NAME = "store_name"
+        private const val KEY_STORE_ADDRESS = "store_address"
+        private const val KEY_STORE_PHONE = "store_phone"
         private const val KEY_STORE_LOGO = "store_logo_uri"
         private const val KEY_PIN_HASH = "manager_pin_hash"
     }

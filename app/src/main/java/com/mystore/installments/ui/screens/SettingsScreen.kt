@@ -64,8 +64,10 @@ fun SettingsScreen(viewModel: AppViewModel) {
     var codeTableInput by remember(savedCodeTable) { mutableStateOf(savedCodeTable?.toString() ?: "") }
     var customCommandInput by remember { mutableStateOf("") }
 
-    // ---------- بيانات المحل (اسم + شعار يظهر أعلى كل فاتورة) ----------
+    // ---------- بيانات المحل (اسم + عنوان + هاتف + شعار يظهر أعلى كل فاتورة) ----------
     var storeName by remember { mutableStateOf(viewModel.appSettings.storeName) }
+    var storeAddress by remember { mutableStateOf(viewModel.appSettings.storeAddress) }
+    var storePhone by remember { mutableStateOf(viewModel.appSettings.storePhone) }
     var storeLogoUri by remember { mutableStateOf(viewModel.appSettings.storeLogoUri?.let { Uri.parse(it) }) }
     val logoPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -220,6 +222,20 @@ fun SettingsScreen(viewModel: AppViewModel) {
             Text(
                 "اضغط على الصورة لاختيار شعار المحل؛ سيُطبع أعلى كل فاتورة ووصل بشكل تلقائي.",
                 style = MaterialTheme.typography.bodySmall
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = storeAddress,
+                onValueChange = { storeAddress = it; viewModel.appSettings.storeAddress = it },
+                label = { Text("عنوان المحل (اختياري، يظهر أعلى الفاتورة)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+            Spacer(Modifier.height(8.dp))
+            OutlinedTextField(
+                value = storePhone,
+                onValueChange = { storePhone = it; viewModel.appSettings.storePhone = it },
+                label = { Text("هاتف المحل (اختياري، يظهر أعلى الفاتورة)") },
+                modifier = Modifier.fillMaxWidth()
             )
 
             HorizontalDivider(Modifier.padding(vertical = 12.dp))

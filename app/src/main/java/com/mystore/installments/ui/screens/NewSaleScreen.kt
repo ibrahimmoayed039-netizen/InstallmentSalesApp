@@ -275,6 +275,8 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                                 title = "فاتورة بيع بالتقسيط رقم $saleId",
                                 customerName = customer.name,
                                 customerPhone = customer.phone,
+                                storeAddress = viewModel.appSettings.storeAddress,
+                                storePhone = viewModel.appSettings.storePhone,
                                 itemsSummary = cartItems.map { ReceiptItemLine("${it.name} × ${it.quantity}", formatAmount(it.lineTotal)) },
                                 lines = receiptLines
                             )

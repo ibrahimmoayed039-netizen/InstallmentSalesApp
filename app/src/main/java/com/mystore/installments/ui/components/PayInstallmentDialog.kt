@@ -51,6 +51,8 @@ fun PayInstallmentDialog(
                             title = "وصل استلام دفعة",
                             customerName = customerName,
                             customerPhone = customerPhone,
+                            storeAddress = viewModel.appSettings.storeAddress,
+                            storePhone = viewModel.appSettings.storePhone,
                             lines = listOf(
                                 ReceiptLine("القسط رقم", installmentNumber.toString()),
                                 ReceiptLine("المبلغ المسدد", formatAmount(amount), bold = true),

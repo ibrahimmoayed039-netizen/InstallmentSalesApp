@@ -67,6 +67,8 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
                                         val saleGroups = viewModel.repository.getCustomerStatementItems(customerId)
                                         val receipt = buildStatementReceipt(
                                             storeName = viewModel.appSettings.storeName.ifBlank { "متجرنا" },
+                                            storeAddress = viewModel.appSettings.storeAddress,
+                                            storePhone = viewModel.appSettings.storePhone,
                                             customer = cust,
                                             saleGroups = saleGroups
                                         )
@@ -107,6 +109,8 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
                                 title = "فاتورة بيع بالتقسيط رقم ${s.id}",
                                 customerName = cust.name,
                                 customerPhone = cust.phone,
+                                storeAddress = viewModel.appSettings.storeAddress,
+                                storePhone = viewModel.appSettings.storePhone,
                                 itemsSummary = items.map { ReceiptItemLine("${it.name} × ${it.quantity}", formatAmount(it.lineTotal)) },
                                 lines = lines
                             )
@@ -137,6 +141,8 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
 /** يبني وصل "كشف حساب" واحد يجمع كل فواتير العميل وجداول أقساطها وإجمالياتها */
 private fun buildStatementReceipt(
     storeName: String,
+    storeAddress: String,
+    storePhone: String,
     customer: Customer,
     saleGroups: List<Pair<Sale, List<Installment>>>
 ): ReceiptData {
@@ -173,6 +179,8 @@ private fun buildStatementReceipt(
         title = "كشف حساب العميل",
         customerName = customer.name,
         customerPhone = customer.phone,
+        storeAddress = storeAddress,
+        storePhone = storePhone,
         itemsSummary = itemsSummary,
         lines = listOf(
             ReceiptLine("عدد الفواتير", saleGroups.size.toString()),

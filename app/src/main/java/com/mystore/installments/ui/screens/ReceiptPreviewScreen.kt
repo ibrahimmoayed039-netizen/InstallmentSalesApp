@@ -13,6 +13,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,10 +101,13 @@ fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) 
                             }
                             items(previewLines) { line ->
                                 Text(
-                                    text = line,
+                                    text = line.text,
                                     fontFamily = FontFamily.Monospace,
+                                    fontWeight = if (line.bold) FontWeight.Bold else FontWeight.Normal,
                                     fontSize = 13.sp,
-                                    color = Color.Black
+                                    color = Color.Black,
+                                    textAlign = if (line.centered) TextAlign.Center else TextAlign.Start,
+                                    modifier = Modifier.fillMaxWidth()
                                 )
                             }
                         }
