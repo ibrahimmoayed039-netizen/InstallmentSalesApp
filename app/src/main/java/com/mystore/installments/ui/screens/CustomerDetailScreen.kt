@@ -20,6 +20,7 @@ import com.mystore.installments.data.entity.Installment
 import com.mystore.installments.data.entity.InstallmentStatus
 import com.mystore.installments.data.entity.Sale
 import com.mystore.installments.data.entity.SaleStatus
+import com.mystore.installments.ui.theme.PrimaryLight
 import com.mystore.installments.printer.ReceiptData
 import com.mystore.installments.printer.ReceiptItemLine
 import com.mystore.installments.printer.ReceiptLine
@@ -198,7 +199,7 @@ private fun saleStatusColor(sale: Sale, installments: List<Installment>): Color 
         hasLate -> Color(0xFFC62828)
         sale.status == SaleStatus.COMPLETED -> Color(0xFF2E7D32)
         sale.status == SaleStatus.CANCELLED -> Color(0xFF9E9E9E)
-        else -> Color(0xFF1565C0)
+        else -> PrimaryLight
     }
 }
 

@@ -1,9 +1,14 @@
 package com.mystore.installments.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
@@ -12,7 +17,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -59,12 +66,14 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
                     SummaryCard(
                         title = "عدد المبيعات",
                         value = sales.size.toString(),
+                        icon = Icons.Filled.ReceiptLong,
                         modifier = Modifier.weight(1f),
                         color = MaterialTheme.colorScheme.primary
                     )
                     SummaryCard(
                         title = "مبالغ مستحقة",
                         value = formatAmount(totalOutstanding),
+                        icon = Icons.Filled.Schedule,
                         modifier = Modifier.weight(1f),
                         color = Color(0xFF2E7D32)
                     )
@@ -74,6 +83,7 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
                 SummaryCard(
                     title = "أقساط متأخرة (${overdue.size})",
                     value = formatAmount(totalOverdue),
+                    icon = Icons.Filled.Warning,
                     modifier = Modifier.fillMaxWidth(),
                     color = Color(0xFFC62828)
                 )
@@ -90,7 +100,27 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
 
             if (overdue.isEmpty()) {
                 item {
-                    Text("لا توجد أقساط متأخرة حالياً 👍", color = MaterialTheme.colorScheme.secondary)
+                    // حالة فارغة ودّية بدل سطر نص عادي، لطمأنة صاحب المحل أن كل شيء تمام
+                    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Icon(
+                                Icons.Filled.CheckCircle,
+                                contentDescription = null,
+                                tint = Color(0xFF2E7D32),
+                                modifier = Modifier.size(40.dp)
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text("لا توجد أقساط متأخرة حالياً", fontWeight = FontWeight.Bold)
+                            Text(
+                                "كل الأقساط ضمن مواعيدها 👍",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             } else {
                 items(overdue) { inst ->
@@ -118,12 +148,30 @@ fun DashboardScreen(viewModel: AppViewModel, navController: NavController) {
 }
 
 @Composable
-private fun SummaryCard(title: String, value: String, modifier: Modifier = Modifier, color: Color) {
+private fun SummaryCard(
+    title: String,
+    value: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    color: Color
+) {
     ElevatedCard(modifier = modifier) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            Spacer(Modifier.height(4.dp))
-            Text(value, style = MaterialTheme.typography.titleLarge, color = color, fontWeight = FontWeight.Bold)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(color.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Text(title, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(10.dp))
+            Text(value, style = MaterialTheme.typography.headlineSmall, color = color)
         }
     }
 }
