@@ -59,6 +59,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         cashPrice: Double,
         installmentPrice: Double,
         imageUri: String? = null,
+        stockQuantity: Int = 0,
         onDone: (Long) -> Unit = {}
     ) {
         viewModelScope.launch {
@@ -70,7 +71,8 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                     costPrice = costPrice,
                     cashPrice = cashPrice,
                     installmentPrice = installmentPrice,
-                    imageUri = imageUri
+                    imageUri = imageUri,
+                    stockQuantity = stockQuantity
                 )
             )
             onDone(id)

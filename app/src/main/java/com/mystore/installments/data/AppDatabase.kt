@@ -22,7 +22,7 @@ import com.mystore.installments.data.entity.SaleItem
 // قاعدة بيانات محلية (SQLite عبر Room) تبقى محفوظة حتى بعد إغلاق التطبيق
 @Database(
     entities = [Customer::class, Sale::class, SaleItem::class, Installment::class, Payment::class, Product::class],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -53,6 +53,13 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /** ترقية 5 إلى 6: تضيف عمود كمية المخزون للمنتجات (بدون فقدان أي بيانات موجودة) */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE products ADD COLUMN stockQuantity INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun getInstance(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val instance = build(context)
@@ -63,7 +70,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         private fun build(context: Context): AppDatabase {
             return Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, DB_NAME)
-                .addMigrations(MIGRATION_4_5)
+                .addMigrations(MIGRATION_4_5, MIGRATION_5_6)
                 .build()
         }
 

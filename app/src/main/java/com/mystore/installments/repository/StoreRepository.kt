@@ -76,6 +76,17 @@ class StoreRepository(
 
         if (items.isNotEmpty()) {
             saleDao.insertItems(items.map { it.copy(saleId = saleId) })
+            // خصم الكمية المباعة من مخزون كل منتج مرتبط بصنف من أصناف الفاتورة تلقائياً
+            items.forEach { item ->
+                val productId = item.productId
+                if (productId != null) {
+                    val product = productDao.getById(productId)
+                    if (product != null) {
+                        val newStock = (product.stockQuantity - item.quantity).coerceAtLeast(0)
+                        productDao.update(product.copy(stockQuantity = newStock))
+                    }
+                }
+            }
         }
 
         // توليد جدول الأقساط الشهري تلقائياً

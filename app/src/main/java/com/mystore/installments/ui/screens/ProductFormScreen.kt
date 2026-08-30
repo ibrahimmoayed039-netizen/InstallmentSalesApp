@@ -45,6 +45,7 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
     var costPrice by remember { mutableStateOf("") }
     var cashPrice by remember { mutableStateOf("") }
     var installmentPrice by remember { mutableStateOf("") }
+    var stockQuantity by remember { mutableStateOf("") }
     var imageUri by remember { mutableStateOf<Uri?>(null) }
 
     // منتقي الصور: يمنح صلاحية دائمة (Persistable) للاحتفاظ بمسار الصورة بعد إغلاق التطبيق
@@ -76,6 +77,7 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
                 costPrice = if (product.costPrice == 0.0) "" else product.costPrice.toString()
                 cashPrice = if (product.cashPrice == 0.0) "" else product.cashPrice.toString()
                 installmentPrice = if (product.installmentPrice == 0.0) "" else product.installmentPrice.toString()
+                stockQuantity = if (product.stockQuantity == 0) "" else product.stockQuantity.toString()
                 imageUri = product.imageUri?.let { Uri.parse(it) }
             }
         }
@@ -184,6 +186,15 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
                 modifier = Modifier.fillMaxWidth()
             )
 
+            HorizontalDivider(Modifier.padding(vertical = 4.dp))
+            Text("المخزون", style = MaterialTheme.typography.titleSmall)
+            OutlinedTextField(
+                value = stockQuantity, onValueChange = { stockQuantity = it.filter { c -> c.isDigit() } },
+                label = { Text("الكمية المتوفرة") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth()
+            )
+
             Spacer(Modifier.height(8.dp))
             Button(
                 onClick = {
@@ -191,6 +202,7 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
                         val cost = costPrice.toDoubleOrNull() ?: 0.0
                         val cash = cashPrice.toDoubleOrNull() ?: 0.0
                         val installment = installmentPrice.toDoubleOrNull() ?: 0.0
+                        val stock = stockQuantity.toIntOrNull() ?: 0
                         val imageUriString = imageUri?.toString()
 
                         val current = existingProduct
@@ -203,7 +215,8 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
                                     costPrice = cost,
                                     cashPrice = cash,
                                     installmentPrice = installment,
-                                    imageUri = imageUriString
+                                    imageUri = imageUriString,
+                                    stockQuantity = stock
                                 )
                             ) { navController.popBackStack() }
                         } else {
@@ -214,7 +227,8 @@ fun ProductFormScreen(viewModel: AppViewModel, navController: NavController, pro
                                 costPrice = cost,
                                 cashPrice = cash,
                                 installmentPrice = installment,
-                                imageUri = imageUriString
+                                imageUri = imageUriString,
+                                stockQuantity = stock
                             ) { navController.popBackStack() }
                         }
                     }

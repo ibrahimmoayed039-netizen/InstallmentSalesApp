@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
@@ -124,7 +125,7 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                                     Column {
                                         Text(p.name, fontWeight = FontWeight.Bold)
                                         Text(
-                                            "تقسيط: ${p.installmentPrice}  •  نقداً: ${p.cashPrice}",
+                                            "تقسيط: ${formatAmount(p.installmentPrice)}  •  نقداً: ${formatAmount(p.cashPrice)}  •  متوفر: ${p.stockQuantity}",
                                             style = MaterialTheme.typography.bodySmall
                                         )
                                     }
@@ -136,6 +137,19 @@ fun NewSaleScreen(viewModel: AppViewModel, navController: NavController) {
                                 }
                             )
                         }
+                    }
+                }
+
+                selectedProduct?.let { p ->
+                    val lowStock = p.stockQuantity in 1..3
+                    val outOfStock = p.stockQuantity <= 0
+                    if (outOfStock || lowStock) {
+                        Text(
+                            if (outOfStock) "⚠ هذا المنتج نفد من المخزون" else "⚠ الكمية المتبقية بالمخزون: ${p.stockQuantity}",
+                            color = if (outOfStock) Color(0xFFC62828) else Color(0xFFEF6C00),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
                 }
 
