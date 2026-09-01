@@ -36,6 +36,7 @@ import com.mystore.installments.printer.PaperWidth
 import com.mystore.installments.printer.PrinterConnectionType
 import com.mystore.installments.printer.RawCommandParser
 import com.mystore.installments.viewmodel.AppViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -163,6 +164,19 @@ fun SettingsScreen(viewModel: AppViewModel) {
     }
     DisposableEffect(Unit) {
         onDispose { viewModel.printerManager.stopBluetoothDiscovery() }
+    }
+
+    // حماية إضافية: لو "isScanning" ضلت true أكتر من ١٥ ثانية (مثلاً بسبب حالة لم
+    // يلتقطها الإصلاح بـ startDiscovery)، نوقف المسح تلقائياً بدل ما تعلق للأبد
+    LaunchedEffect(isScanning) {
+        if (isScanning) {
+            delay(15_000)
+            if (isScanning) {
+                viewModel.printerManager.stopBluetoothDiscovery()
+                isScanning = false
+                statusMessage = "توقف البحث عن الأجهزة (انتهت المهلة)"
+            }
+        }
     }
 
     Scaffold(topBar = { TopAppBar(title = { Text("الإعدادات") }) }) { padding ->

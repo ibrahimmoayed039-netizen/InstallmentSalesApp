@@ -15,11 +15,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import coil.compose.AsyncImage
+import com.mystore.installments.printer.ContractPrinter
 import com.mystore.installments.printer.PrinterConnectionType
 import com.mystore.installments.printer.ReceiptBuilder
 import com.mystore.installments.ui.nav.Routes
@@ -35,7 +37,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) {
     val receipt by viewModel.pendingReceipt.collectAsState()
+    val contract by viewModel.pendingContract.collectAsState()
     val connectionType by viewModel.printerManager.connectionType.collectAsState()
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var isPrinting by remember { mutableStateOf(false) }
     var resultMessage by remember { mutableStateOf<String?>(null) }
@@ -119,6 +123,25 @@ fun ReceiptPreviewScreen(viewModel: AppViewModel, navController: NavController) 
             resultMessage?.let {
                 Spacer(Modifier.height(8.dp))
                 Text(it, color = if (it.contains("فشل")) Color(0xFFC62828) else Color(0xFF2E7D32))
+            }
+
+            // ---------- عقد/إقرار التقسيط: يظهر فقط عند بيع تقسيط جديد، طباعة PDF منفصلة عن الوصل الحراري ----------
+            if (contract != null) {
+                Spacer(Modifier.height(12.dp))
+                Card(colors = CardDefaults.cardColors(containerColor = Color(0xFFD3E4F5))) {
+                    Column(Modifier.padding(12.dp)) {
+                        Text("📄 عقد التقسيط جاهز", fontWeight = FontWeight.Bold)
+                        Text(
+                            "يمكنك طباعته على ورقة عادية (A4) أو حفظه كملف PDF ليوقّعه العميل",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = { contract?.let { ContractPrinter.printContract(context, it) } },
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("طباعة عقد التقسيط للتوقيع") }
+                    }
+                }
             }
 
             Spacer(Modifier.height(12.dp))

@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -63,7 +64,7 @@ fun CustomersScreen(viewModel: AppViewModel, navController: NavController) {
                             .clickable { navController.navigate(Routes.customerDetail(customer.id)) }
                     ) {
                         Row(
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(start = 4.dp, top = 14.dp, bottom = 14.dp, end = 14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             // أفاتار بحرف اسم العميل الأول، بلون ثابت مشتق من اسمه للتمييز السريع بين العملاء بالقائمة
@@ -82,7 +83,7 @@ fun CustomersScreen(viewModel: AppViewModel, navController: NavController) {
                                 )
                             }
                             Spacer(Modifier.width(12.dp))
-                            Column {
+                            Column(Modifier.weight(1f)) {
                                 Text(customer.name, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
                                 Spacer(Modifier.height(4.dp))
                                 Row {
@@ -90,6 +91,9 @@ fun CustomersScreen(viewModel: AppViewModel, navController: NavController) {
                                     Spacer(Modifier.width(4.dp))
                                     Text(customer.phone, style = MaterialTheme.typography.bodyMedium)
                                 }
+                            }
+                            IconButton(onClick = { navController.navigate(Routes.customerForm(customer.id)) }) {
+                                Icon(Icons.Filled.Edit, contentDescription = "تعديل بيانات ${customer.name}")
                             }
                         }
                     }

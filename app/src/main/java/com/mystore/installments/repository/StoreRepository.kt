@@ -41,6 +41,7 @@ class StoreRepository(
     suspend fun getSale(id: Long): Sale? = saleDao.getById(id)
     suspend fun getSaleItems(saleId: Long): List<SaleItem> = saleDao.getItemsForSale(saleId)
     fun getInstallmentsForSale(saleId: Long): Flow<List<Installment>> = installmentDao.getForSale(saleId)
+    suspend fun getInstallmentsForSaleOnce(saleId: Long): List<Installment> = installmentDao.getForSaleOnce(saleId)
 
     fun getAllInstallments(): Flow<List<Installment>> = installmentDao.getAll()
     fun getOverdueInstallments(): Flow<List<Installment>> = installmentDao.getOverdue(System.currentTimeMillis())

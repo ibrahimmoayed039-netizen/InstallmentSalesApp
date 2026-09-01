@@ -77,7 +77,12 @@ class BluetoothPrinterManager(private val context: Context) {
                 context.registerReceiver(receiver, filter)
             }
             adapter.cancelDiscovery()
-            adapter.startDiscovery()
+            val started = adapter.startDiscovery()
+            if (!started) {
+                // فشل بدء المسح فعلياً (بلوتوث مطفأ / throttling) فلن يصل ACTION_DISCOVERY_FINISHED أبداً
+                stopDiscovery()
+                onFinished()
+            }
         } catch (e: SecurityException) {
             onFinished()
         }

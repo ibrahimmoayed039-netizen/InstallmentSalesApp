@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -49,7 +51,16 @@ fun CustomerDetailScreen(customerId: Long, viewModel: AppViewModel, navControlle
     var payDialogInstallment by remember { mutableStateOf<Installment?>(null) }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text(customer?.name ?: "بيانات العميل") }) }
+        topBar = {
+            TopAppBar(
+                title = { Text(customer?.name ?: "بيانات العميل") },
+                actions = {
+                    IconButton(onClick = { navController.navigate(Routes.customerForm(customerId)) }) {
+                        Icon(Icons.Filled.Edit, contentDescription = "تعديل بيانات العميل")
+                    }
+                }
+            )
+        }
     ) { padding ->
         LazyColumn(modifier = Modifier.fillMaxSize().padding(padding).padding(12.dp)) {
             item {

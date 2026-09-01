@@ -13,7 +13,8 @@ import com.mystore.installments.viewmodel.AppViewModel
 object Routes {
     const val DASHBOARD = "dashboard"
     const val CUSTOMERS = "customers"
-    const val CUSTOMER_FORM = "customer_form"
+    const val CUSTOMER_FORM = "customer_form?customerId={customerId}"
+    fun customerForm(id: Long? = null) = "customer_form?customerId=${id ?: 0L}"
     const val NEW_SALE = "new_sale"
     const val INSTALLMENTS = "installments"
     const val REPORTS = "reports"
@@ -38,8 +39,16 @@ fun AppNavGraph(viewModel: AppViewModel) {
         composable(Routes.CUSTOMERS) {
             CustomersScreen(viewModel = viewModel, navController = navController)
         }
-        composable(Routes.CUSTOMER_FORM) {
-            CustomerFormScreen(viewModel = viewModel, navController = navController)
+        composable(
+            Routes.CUSTOMER_FORM,
+            arguments = listOf(navArgument("customerId") { type = NavType.LongType; defaultValue = 0L })
+        ) { backStackEntry ->
+            val customerId = backStackEntry.arguments?.getLong("customerId") ?: 0L
+            CustomerFormScreen(
+                viewModel = viewModel,
+                navController = navController,
+                customerId = if (customerId == 0L) null else customerId
+            )
         }
         composable(
             Routes.CUSTOMER_DETAIL,

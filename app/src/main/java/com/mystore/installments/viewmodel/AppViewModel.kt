@@ -50,6 +50,20 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun updateCustomer(customer: Customer, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.updateCustomer(customer)
+            onDone()
+        }
+    }
+
+    fun deleteCustomer(customer: Customer, onDone: () -> Unit = {}) {
+        viewModelScope.launch {
+            repository.deleteCustomer(customer)
+            onDone()
+        }
+    }
+
     // ---------- المنتجات ----------
     fun addProduct(
         name: String,
@@ -121,9 +135,16 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val _pendingReceipt = MutableStateFlow<ReceiptData?>(null)
     val pendingReceipt: StateFlow<ReceiptData?> = _pendingReceipt
 
-    fun setPendingReceipt(receipt: ReceiptData) {
+    fun setPendingReceipt(receipt: ReceiptData, contract: com.mystore.installments.printer.ContractData? = null) {
         _pendingReceipt.value = receipt
+        // نصفّر عقد التقسيط المعلّق افتراضياً حتى لا يظهر زر "طباعة العقد" خطأً على وصل غير
+        // مرتبط ببيع جديد (مثل طباعة فاتورة سابقة أو كشف حساب)، إلا إذا مُرِّر عقد صراحةً هنا
+        _pendingContract.value = contract
     }
+
+    // ---------- معاينة/طباعة عقد التقسيط (PDF قابل للتوقيع) ----------
+    private val _pendingContract = MutableStateFlow<com.mystore.installments.printer.ContractData?>(null)
+    val pendingContract: StateFlow<com.mystore.installments.printer.ContractData?> = _pendingContract
 
     suspend fun printPendingReceipt(): Boolean {
         val receipt = _pendingReceipt.value ?: return false
